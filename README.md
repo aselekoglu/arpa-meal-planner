@@ -1,20 +1,38 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Arpa Meal Planner
 
-# Run and deploy your AI Studio app
+A comprehensive, full-stack meal planning application designed to streamline your kitchen management. Plan your week, track your pantry, and generate smart grocery lists with ease.
 
-This contains everything you need to run your app locally.
+## Desktop Usage Instructions
 
-View your app in AI Studio: https://ai.studio/apps/2865a118-237a-4e95-8bb6-9ab67b9c1c50
+### 1. Managing Your Meals (Dashboard)
+- **View Meals**: The home screen displays your saved meals. Use the search bar or tag filters to find specific recipes.
+- **Add a Meal**: Click the **"Add Meal"** button. You can manually enter the name, ingredients, and instructions.
+- **Image Management**: In the meal form, you can add a photo by:
+  - **Uploading** a file from your computer.
+  - **Taking a photo** using your webcam (click the Camera icon).
+  - **Pasting a URL** to an image from the web.
+- **Import Recipes**: Click the **"Import"** button to find recipes from across the web. Simply enter a search query, and Bebü Bot will find and format the recipe for you.
+- **Edit/Delete**: Use the menu (three dots) on any meal card to modify or remove it.
 
-## Run Locally
+### 2. Weekly Planning
+- **Navigate to Planner**: Click "Planner" in the sidebar.
+- **Manual Planning**: Drag and drop meals from the side panel onto specific days of the week.
+- **Smart Generation**: Click **"Generate Plan"** to have the AI create a balanced weekly menu based on your preferences and diet (e.g., Mediterranean, High Protein).
+- **Navigation**: Use the "Previous" and "Next" buttons to plan for future weeks.
 
-**Prerequisites:**  Node.js
+### 3. Grocery Lists & Pantry
+- **Grocery List**: Navigate to "Grocery List". The app automatically calculates what you need based on your weekly plan.
+- **Smart Grouping**: Click **"Smart Group"** to organize your list by supermarket aisles (Produce, Dairy, etc.).
+- **Pantry Sync**: Items you already have in your **Pantry Inventory** are automatically excluded from your shopping list.
+- **Export**: Click **"Export PDF"** to get a printable version of your shopping list.
+- **Pantry Management**: Switch to the "Pantry Inventory" tab to track what you have in stock. Adding items here keeps your grocery list accurate.
 
+### 4. Bebü Bot (AI Assistant)
+- **Chat**: Click the floating robot icon in the bottom right corner.
+- **Ask Anything**: Bebü Bot can suggest recipes based on what you have, answer cooking questions, or help you refine your meal plan. It has access to your saved meals to provide personalized advice.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Features
+- **Full-Stack Sync**: Real-time synchronization across devices for your family.
+- **Nutritional Tracking**: Automatic calculation of calories and macros for your meals.
+- **Responsive Design**: Optimized for both large desktop monitors and smaller laptop screens.
+- **Dark Mode Support**: Automatically adjusts to your system's light/dark preferences.
