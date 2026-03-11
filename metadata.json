@@ -1,0 +1,5 @@
+{
+  "name": "Arpa Meal Planner",
+  "description": "A comprehensive meal planner application to manage meals, plan weekly menus, and generate grocery lists.",
+  "requestFramePermissions": ["camera"]
+}
