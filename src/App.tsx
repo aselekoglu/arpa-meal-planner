@@ -41,10 +41,20 @@ export default function App() {
       <div className="min-h-screen bg-stone-50 dark:bg-stone-950 text-stone-900 dark:text-stone-100 font-sans flex flex-col transition-colors">
         <header className="bg-white dark:bg-stone-900 border-b border-stone-200 dark:border-stone-800 sticky top-0 z-10 transition-colors">
           <div className="max-w-5xl mx-auto px-4 h-16 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-500 font-semibold text-xl">
-              <svg viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8">
-                <path d="M12 3C10.5 3 9.2 3.5 8.1 4.3L4 2L5.2 6.8C3.2 8.5 2 11.1 2 14C2 18.4 6.5 22 12 22C17.5 22 22 18.4 22 14C22 11.1 20.8 8.5 18.8 6.8L20 2L15.9 4.3C14.8 3.5 13.5 3 12 3Z" />
-              </svg>
+            <div className="flex items-center gap-0 text-emerald-600 dark:text-emerald-500 font-semibold text-3xl">
+              <div 
+                className="w-16 h-16 bg-current transform -scale-x-100 rotate-12 -mr-4 z-10" 
+                style={{ 
+                  WebkitMaskImage: 'url(/arpa-icon.svg)', 
+                  maskImage: 'url(/arpa-icon.svg)', 
+                  WebkitMaskSize: 'contain', 
+                  maskSize: 'contain',
+                  WebkitMaskRepeat: 'no-repeat',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskPosition: 'center',
+                  maskPosition: 'center'
+                }} 
+              />
               <span>ARPA: Meal Planner</span>
             </div>
             <nav className="flex items-center gap-6">
@@ -60,7 +70,7 @@ export default function App() {
                 <ShoppingCart className="w-4 h-4" />
                 <span>Groceries</span>
               </Link>
-              <button 
+              <button
                 onClick={() => setIsDarkMode(!isDarkMode)}
                 className="p-2 text-stone-500 hover:text-stone-900 dark:text-stone-400 dark:hover:text-stone-100 transition-colors rounded-full hover:bg-stone-100 dark:hover:bg-stone-800"
               >
@@ -84,7 +94,7 @@ export default function App() {
             <Route path="/grocery" element={<GroceryList />} />
           </Routes>
         </main>
-        
+
         <Chatbot />
       </div>
       {/* Family Sync Modal */}
@@ -95,7 +105,7 @@ export default function App() {
             <p className="text-stone-500 dark:text-stone-400 mb-6 text-sm">
               Enter a shared family code to sync meals, planner, and grocery lists across devices. Leave blank for personal use.
             </p>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-1">
@@ -109,7 +119,7 @@ export default function App() {
                   className="w-full px-4 py-2 bg-stone-50 dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-stone-900 dark:text-stone-100"
                 />
               </div>
-              
+
               <div className="flex gap-3 pt-2">
                 <button
                   onClick={() => setIsFamilyModalOpen(false)}
