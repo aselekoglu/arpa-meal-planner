@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Meal } from '../types';
-import { GoogleGenAI } from '@google/genai';
 import { apiFetch } from '../lib/api';
 
 interface ImageGeneratorProps {
@@ -20,55 +19,21 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
     setError('');
 
     try {
-      // Use AI Studio's built-in key selection for paid models
-      // @ts-ignore
-      if (window.aistudio && !await window.aistudio.hasSelectedApiKey()) {
-        // @ts-ignore
-        await window.aistudio.openSelectKey();
-      }
-      
-      const prompt = `A high-quality, appetizing food photography shot of ${meal.name}, which is a ${meal.tag} dish. Ingredients include: ${meal.ingredients.map(i => i.name).join(', ')}. Professional lighting, shallow depth of field, delicious looking.`;
-      
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-image-preview',
-        contents: prompt,
-        config: {
-          imageConfig: {
-            aspectRatio: "1:1",
-            imageSize: size || "1K"
-          }
-        }
-      });
-
-      let imageUrl = null;
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          const base64EncodeString = part.inlineData.data;
-          imageUrl = `data:image/png;base64,${base64EncodeString}`;
-          break;
-        }
-      }
-
-      if (!imageUrl) {
-        throw new Error('Failed to generate image');
-      }
-
-      // Update the meal with the new image URL
-      await apiFetch(`/api/meals/${meal.id}`, {
-        method: 'PUT',
+      const res = await apiFetch('/api/ai/generate-meal-image', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: meal.name,
-          tag: meal.tag,
-          ingredients: meal.ingredients,
-          image_url: imageUrl
-        }),
+        body: JSON.stringify({ mealId: meal.id, size }),
       });
-
-      onSuccess(imageUrl);
-    } catch (err: any) {
-      setError(err.message || 'An error occurred');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Image generation failed');
+      }
+      if (!data.imageUrl) {
+        throw new Error('No image returned');
+      }
+      onSuccess(data.imageUrl as string);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setLoading(false);
     }

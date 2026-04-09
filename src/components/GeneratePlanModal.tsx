@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
-import { GoogleGenAI, Type } from '@google/genai';
-import { format, addDays } from 'date-fns';
+import { format } from 'date-fns';
 import { apiFetch } from '../lib/api';
 
 interface GeneratePlanModalProps {
@@ -34,101 +33,23 @@ export default function GeneratePlanModal({ isOpen, onClose, onSave, startDate }
     setError('');
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const prompt = `Generate a 7-day dinner meal plan for a ${diet} diet.
-      Return a JSON object with a 'meals' array containing exactly 7 meals (one for each day of the week).
-      Each meal must have:
-      - 'name': The name of the meal
-      - 'tag': A short category tag (e.g., '${diet}', 'Dinner')
-      - 'ingredients': An array of ingredients required for the meal.
-      For each ingredient, provide:
-      - 'name': Ingredient name
-      - 'amount': Quantity (number)
-      - 'measure': Unit of measurement (e.g., 'Gram (g)', 'Unit', 'Cup (c)', 'Tablespoon (Tbsp)')
-      - 'calories': Estimated calories (number)
-      - 'protein': Estimated protein in grams (number)
-      - 'fat': Estimated fat in grams (number)
-      - 'carbs': Estimated carbs in grams (number)
-      Make sure the nutritional values are realistic and appropriate for the selected diet.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              meals: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    tag: { type: Type.STRING },
-                    ingredients: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          name: { type: Type.STRING },
-                          amount: { type: Type.NUMBER },
-                          measure: { type: Type.STRING },
-                          calories: { type: Type.NUMBER },
-                          protein: { type: Type.NUMBER },
-                          fat: { type: Type.NUMBER },
-                          carbs: { type: Type.NUMBER }
-                        },
-                        required: ['name', 'amount', 'measure', 'calories', 'protein', 'fat', 'carbs']
-                      }
-                    }
-                  },
-                  required: ['name', 'tag', 'ingredients']
-                }
-              }
-            },
-            required: ['meals']
-          }
-        }
+      const res = await apiFetch('/api/ai/generate-plan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate: format(startDate, 'yyyy-MM-dd'),
+          diet,
+        }),
       });
-
-      const data = JSON.parse(response.text || '{}');
-
-      if (!data.meals || !Array.isArray(data.meals) || data.meals.length !== 7) {
-        throw new Error('Failed to generate a complete 7-day meal plan. Please try again.');
-      }
-
-      // Save each meal and add to planner
-      for (let i = 0; i < 7; i++) {
-        const meal = data.meals[i];
-        const dateStr = format(addDays(startDate, i), 'yyyy-MM-dd');
-
-        // 1. Save the meal
-        const mealRes = await apiFetch('/api/meals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(meal)
-        });
-
-        if (!mealRes.ok) {
-          throw new Error('Failed to save generated meal.');
-        }
-
-        const mealData = await mealRes.json();
-
-        // 2. Add to planner
-        await apiFetch('/api/planner', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ date: dateStr, meal_id: mealData.id })
-        });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to generate meal plan');
       }
 
       onSave();
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Generation error:', err);
-      setError(err.message || 'An error occurred while generating the meal plan.');
+      setError(err instanceof Error ? err.message : 'An error occurred while generating the meal plan.');
     } finally {
       setLoading(false);
     }

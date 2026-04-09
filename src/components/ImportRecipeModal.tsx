@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { X, Search, Loader2, Link as LinkIcon } from 'lucide-react';
-import { GoogleGenAI, Type } from '@google/genai';
+import { apiFetch } from '../lib/api';
 
 interface ImportRecipeModalProps {
   isOpen: boolean;
@@ -22,65 +22,24 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
     setError('');
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-      
-      const prompt = `Search for a recipe for "${query}". 
-      Extract the recipe name, a suitable category/tag (e.g., Italian, Dessert, Breakfast), the list of ingredients, and step-by-step instructions.
-      If the query is a URL, extract the information from that specific URL and include it as the source_url.
-      If you can find a high-quality image URL for the recipe, include it as image_url.
-      For each ingredient, estimate the nutritional information (calories, protein, fat, carbs) based on standard nutritional databases.
-      Return the result as a JSON object matching the provided schema.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              tag: { type: Type.STRING },
-              instructions: { 
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: "Step-by-step instructions"
-              },
-              source_url: { type: Type.STRING },
-              image_url: { type: Type.STRING },
-              ingredients: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    amount: { type: Type.NUMBER },
-                    measure: { type: Type.STRING },
-                    calories: { type: Type.NUMBER },
-                    protein: { type: Type.NUMBER },
-                    fat: { type: Type.NUMBER },
-                    carbs: { type: Type.NUMBER }
-                  },
-                  required: ['name', 'amount', 'measure', 'calories', 'protein', 'fat', 'carbs']
-                }
-              }
-            },
-            required: ['name', 'tag', 'ingredients']
-          }
-        }
+      const res = await apiFetch('/api/ai/import-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query.trim() }),
       });
-
-      const data = JSON.parse(response.text || '{}');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Import failed');
+      }
 
       if (!data.name || !data.ingredients) {
         throw new Error('Failed to parse recipe data. Please try another query.');
       }
 
       onSave(data);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Import error:', err);
-      setError(err.message || 'An error occurred while importing the recipe.');
+      setError(err instanceof Error ? err.message : 'An error occurred while importing the recipe.');
     } finally {
       setLoading(false);
     }

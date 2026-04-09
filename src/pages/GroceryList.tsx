@@ -4,7 +4,6 @@ import { ShoppingCart, CheckCircle2, Circle, FileDown, Sparkles, Package, Plus, 
 import { Meal, PlannerItem, PantryItem } from '../types';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { GoogleGenAI, Type } from '@google/genai';
 import { apiFetch } from '../lib/api';
 
 interface GroceryItem {
@@ -156,34 +155,24 @@ export default function GroceryList() {
   const smartGroup = async () => {
     setIsGrouping(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const itemsToGroup = Object.values(groceryList).map(i => i.name);
       
       if (itemsToGroup.length === 0) return;
 
-      const prompt = `Categorize these grocery items into standard supermarket aisles (e.g., Produce, Dairy, Meat, Pantry, Bakery, Frozen, Household). Return a JSON object mapping each item name to its category. Items: ${itemsToGroup.join(', ')}`;
-      
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            description: "Map of item name to category",
-            additionalProperties: { type: Type.STRING }
-          }
-        }
+      const res = await apiFetch('/api/ai/grocery-group', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: itemsToGroup }),
       });
-      
-      if (response.text) {
-        const newCategories = JSON.parse(response.text);
-        setCategories(prev => ({ ...prev, ...newCategories }));
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.categories && typeof data.categories === 'object') {
+        setCategories(prev => ({ ...prev, ...data.categories }));
+        return;
       }
-    } catch (error: any) {
+      throw new Error(data.error || 'Grouping request failed');
+    } catch (error: unknown) {
       console.error('Failed to group items', error);
       
-      // Fallback: Basic local categorization for common items
       const commonCategories: Record<string, string> = {
         'milk': 'Dairy', 'cheese': 'Dairy', 'yogurt': 'Dairy', 'butter': 'Dairy', 'eggs': 'Dairy',
         'apple': 'Produce', 'banana': 'Produce', 'tomato': 'Produce', 'onion': 'Produce', 'garlic': 'Produce', 'potato': 'Produce', 'carrot': 'Produce', 'lettuce': 'Produce', 'spinach': 'Produce', 'cucumber': 'Produce', 'pepper': 'Produce', 'broccoli': 'Produce',
@@ -208,7 +197,8 @@ export default function GroceryList() {
         setCategories(prev => ({ ...prev, ...fallbackCategories }));
       }
 
-      if (error.status === 'RESOURCE_EXHAUSTED' || (error.error && error.error.status === 'RESOURCE_EXHAUSTED')) {
+      const errObj = error as { status?: string; error?: { status?: string } };
+      if (errObj?.status === 'RESOURCE_EXHAUSTED' || errObj?.error?.status === 'RESOURCE_EXHAUSTED') {
         alert("Bebü Bot is a bit busy right now (rate limit reached). I've applied some basic grouping for you!");
       } else {
         alert("Something went wrong while grouping. I've tried my best to categorize common items.");

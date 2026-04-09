@@ -7,7 +7,12 @@ import GroceryList from './pages/GroceryList';
 import Chatbot from './components/Chatbot';
 
 export default function App() {
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const saved = localStorage.getItem('darkMode');
+    if (saved === 'true') return true;
+    if (saved === 'false') return false;
+    return true; // default to dark mode
+  });
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
   const [familyCode, setFamilyCode] = useState('');
   const [currentFamily, setCurrentFamily] = useState('default');
@@ -26,6 +31,7 @@ export default function App() {
     } else {
       document.documentElement.classList.remove('dark');
     }
+    localStorage.setItem('darkMode', String(isDarkMode));
   }, [isDarkMode]);
 
   const handleSaveFamily = () => {

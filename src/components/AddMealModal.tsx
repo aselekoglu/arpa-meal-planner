@@ -128,22 +128,26 @@ export default function AddMealModal({ isOpen, onClose, onSave, editingMeal }: A
     };
 
     try {
-      if (editingMeal && editingMeal.id) {
-        await apiFetch(`/api/meals/${editingMeal.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(mealData)
-        });
-      } else {
-        await apiFetch('/api/meals', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(mealData)
-        });
+      const res =
+        editingMeal && editingMeal.id
+          ? await apiFetch(`/api/meals/${editingMeal.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(mealData),
+            })
+          : await apiFetch('/api/meals', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(mealData),
+            });
+      const errBody = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((errBody as { error?: string }).error || 'Failed to save meal');
       }
       onSave();
     } catch (error) {
       console.error('Failed to save meal', error);
+      alert(error instanceof Error ? error.message : 'Failed to save meal');
     }
   };
 
