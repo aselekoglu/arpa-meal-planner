@@ -2,6 +2,23 @@
 
 A comprehensive, full-stack meal planning application designed to streamline your kitchen management. Plan your week, track your pantry, and generate smart grocery lists with ease.
 
+## Running Instructions
+
+1. Install dependencies:
+   - `npm install`
+2. Create your local environment file:
+   - Copy `.env.example` to `.env`
+   - Set `GEMINI_API_KEY` in `.env` (required for AI features)
+3. Start the app:
+   - `npm run dev`
+4. Open your browser:
+   - `http://127.0.0.1:3000`
+
+### Optional Commands
+- `npm run build` - Build production assets
+- `npm run preview` - Preview the production build
+- `npm run lint` - Type-check the project
+
 ## Desktop Usage Instructions
 
 ### 1. Managing Your Meals (Dashboard)
