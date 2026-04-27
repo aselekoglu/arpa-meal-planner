@@ -1,3 +1,114 @@
 @import "tailwindcss";
 
 @variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Surfaces (warm cream palette) */
+  --color-surface: #fef9f2;
+  --color-surface-bright: #fef9f2;
+  --color-surface-dim: #ded9d3;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8f3ec;
+  --color-surface-container: #f2ede6;
+  --color-surface-container-high: #ece7e1;
+  --color-surface-container-highest: #e6e2db;
+  --color-surface-variant: #e6e2db;
+
+  /* Outlines */
+  --color-outline: #6f7973;
+  --color-outline-variant: #bec9c2;
+
+  /* Foreground */
+  --color-on-surface: #1d1c18;
+  --color-on-surface-variant: #3f4944;
+  --color-on-background: #1d1c18;
+
+  /* Primary (deep emerald) */
+  --color-primary: #004532;
+  --color-primary-container: #065f46;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #8bd6b7;
+  --color-on-primary-fixed: #002116;
+  --color-on-primary-fixed-variant: #00513b;
+  --color-primary-fixed: #a6f2d1;
+  --color-primary-fixed-dim: #8bd6b6;
+
+  /* Secondary (warm coral) */
+  --color-secondary: #9f402d;
+  --color-secondary-container: #fd876f;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #732010;
+  --color-secondary-fixed: #ffdad3;
+  --color-secondary-fixed-dim: #ffb4a5;
+  --color-on-secondary-fixed: #3e0500;
+  --color-on-secondary-fixed-variant: #802918;
+
+  /* Tertiary (toasted ochre) */
+  --color-tertiary: #672903;
+  --color-tertiary-container: #853f19;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #ffb694;
+  --color-tertiary-fixed: #ffdbcc;
+  --color-tertiary-fixed-dim: #ffb693;
+  --color-on-tertiary-fixed: #351000;
+  --color-on-tertiary-fixed-variant: #76330d;
+
+  /* Status */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* Inverse */
+  --color-inverse-surface: #32302c;
+  --color-inverse-on-surface: #f5f0e9;
+  --color-inverse-primary: #8bd6b6;
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-display:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-headline:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
+
+/* Base styles */
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+}
+
+.dark body {
+  background-color: #0c0e0d;
+  color: #e6e2db;
+}
+
+/* Utility: hide scrollbars while keeping scroll behaviour */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar for desktop side panels */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-surface-container-high);
+  border-radius: 9999px;
+}

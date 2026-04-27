@@ -18,10 +18,15 @@ const DIET_OPTIONS = [
   'Paleo',
   'High Protein',
   'Low Carb',
-  'Mediterranean'
+  'Mediterranean',
 ];
 
-export default function GeneratePlanModal({ isOpen, onClose, onSave, startDate }: GeneratePlanModalProps) {
+export default function GeneratePlanModal({
+  isOpen,
+  onClose,
+  onSave,
+  startDate,
+}: GeneratePlanModalProps) {
   const [diet, setDiet] = useState(DIET_OPTIONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -49,32 +54,50 @@ export default function GeneratePlanModal({ isOpen, onClose, onSave, startDate }
       onSave();
     } catch (err: unknown) {
       console.error('Generation error:', err);
-      setError(err instanceof Error ? err.message : 'An error occurred while generating the meal plan.');
+      setError(
+        err instanceof Error ? err.message : 'An error occurred while generating the meal plan.',
+      );
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-stone-900/50 dark:bg-stone-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-stone-900 rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-stone-200 dark:border-stone-800">
-        <div className="px-6 py-4 border-b border-stone-100 dark:border-stone-800 flex justify-between items-center bg-stone-50 dark:bg-stone-800/50">
-          <h2 className="text-xl font-bold text-stone-900 dark:text-stone-100 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-emerald-600 dark:text-emerald-500" />
-            Generate Weekly Plan
-          </h2>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-600 dark:hover:text-stone-300 transition-colors">
+    <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-surface dark:bg-stone-900 rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden border border-outline-variant/15 dark:border-stone-800">
+        <div className="px-6 py-5 flex justify-between items-start">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center">
+              <Sparkles className="w-5 h-5" />
+            </div>
+            <div>
+              <h2 className="text-xl font-display font-extrabold text-primary-container dark:text-primary-fixed-dim tracking-tight">
+                Generate Weekly Plan
+              </h2>
+              <p className="text-xs text-on-surface-variant mt-0.5">
+                Powered by Bebü Bot AI
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-full text-outline hover:bg-surface-container-high transition-colors"
+          >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
-          <p className="text-sm text-stone-600 dark:text-stone-400">
-            Let AI create a complete 7-day meal plan for you starting from <strong>{format(startDate, 'MMM d, yyyy')}</strong>.
+        <div className="px-6 pb-2 space-y-5">
+          <p className="text-sm text-on-surface-variant dark:text-stone-400 leading-relaxed">
+            Let AI craft a complete 7-day meal plan starting from{' '}
+            <strong className="text-on-surface dark:text-stone-100 font-display font-bold">
+              {format(startDate, 'MMM d, yyyy')}
+            </strong>
+            .
           </p>
 
           <div>
-            <label className="block text-sm font-medium text-stone-700 dark:text-stone-300 mb-2">
+            <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline mb-2">
               Dietary Preference
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -82,10 +105,10 @@ export default function GeneratePlanModal({ isOpen, onClose, onSave, startDate }
                 <button
                   key={option}
                   onClick={() => setDiet(option)}
-                  className={`px-3 py-2 text-sm rounded-xl border text-left transition-colors ${
+                  className={`px-3 py-2.5 text-sm rounded-2xl border text-left transition-all ${
                     diet === option
-                      ? 'bg-emerald-50 dark:bg-emerald-900/30 border-emerald-500 text-emerald-700 dark:text-emerald-300 font-medium'
-                      : 'bg-white dark:bg-stone-900 border-stone-200 dark:border-stone-700 text-stone-600 dark:text-stone-400 hover:border-emerald-200 dark:hover:border-emerald-800'
+                      ? 'bg-primary-container/10 border-primary-container text-primary-container dark:bg-primary-fixed-dim/15 dark:border-primary-fixed-dim dark:text-primary-fixed-dim font-display font-semibold'
+                      : 'bg-surface-container-lowest dark:bg-stone-900 border-outline-variant/30 dark:border-stone-700 text-on-surface-variant dark:text-stone-400 hover:border-primary-container/40'
                   }`}
                 >
                   {option}
@@ -95,23 +118,23 @@ export default function GeneratePlanModal({ isOpen, onClose, onSave, startDate }
           </div>
 
           {error && (
-            <div className="p-3 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-400 text-sm rounded-xl border border-red-100 dark:border-red-900/50">
+            <div className="p-3 bg-error-container text-on-error-container text-sm rounded-2xl border border-error/20">
               {error}
             </div>
           )}
         </div>
 
-        <div className="px-6 py-4 bg-stone-50 dark:bg-stone-800/50 border-t border-stone-100 dark:border-stone-800 flex justify-end gap-3">
+        <div className="px-6 py-4 mt-4 bg-surface-container-low dark:bg-stone-800/40 flex justify-end gap-3 border-t border-outline-variant/15 dark:border-stone-800">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-stone-600 dark:text-stone-400 font-medium hover:bg-stone-200 dark:hover:bg-stone-700 rounded-xl transition-colors"
+            className="px-5 py-2.5 text-on-surface-variant dark:text-stone-300 font-display font-semibold text-sm rounded-full hover:bg-surface-container-high dark:hover:bg-stone-700 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleGenerate}
             disabled={loading}
-            className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+            className="px-5 py-2.5 bg-gradient-to-br from-primary to-primary-container text-on-primary font-display font-semibold text-sm rounded-full hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 shadow-sm"
           >
             {loading ? (
               <>
