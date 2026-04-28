@@ -1,10 +1,10 @@
-# Arpa Meal Planner
+# ARPA: Meal Planner
 
 Plan meals faster, shop smarter, and waste less food.
 
 Arpa is a full-stack meal planning app that combines recipe management, weekly planning, pantry tracking, and AI-powered helpers in one workflow.
 
-## Why Arpa
+## Why ARPA
 
 - Build a weekly meal plan in minutes.
 - Auto-generate a grocery list from your plan.
@@ -15,16 +15,19 @@ Arpa is a full-stack meal planning app that combines recipe management, weekly p
 ## Feature Highlights
 
 ### Meal and Recipe Management
+
 - Create, edit, and organize meals with ingredients, instructions, images, tags, and servings.
 - Import recipes from the web.
 - Edit meals directly from meal details.
 
 ### Weekly Planner
+
 - Drag and drop meals into each day of the week.
 - Navigate across weeks to plan ahead.
 - Generate plans with AI support.
 
 ### Grocery List + Pantry Intelligence
+
 - Grocery list is computed from planned meals.
 - Pantry deductions support cross-unit conversions and ingredient-specific logic.
 - Strict measure validation keeps unit data reliable for calculations.
@@ -32,11 +35,13 @@ Arpa is a full-stack meal planning app that combines recipe management, weekly p
 - Export grocery list to PDF.
 
 ### Ingredient Name Hygiene
+
 - Existing ingredient names are suggested while adding/editing recipes.
 - "Merge Similar Items" helps consolidate naming variants (including manual selection).
 - Merge updates related meal ingredients and pantry rows for your current family scope.
 
 ### AI Assist
+
 - Smart grouping by aisle/category from grocery list.
 - "Estimate Nutrition" fills per-ingredient calories/macros in recipe editing.
 - "Fetch Instructions" can pull step-by-step directions when instruction list is empty.
@@ -45,14 +50,14 @@ Arpa is a full-stack meal planning app that combines recipe management, weekly p
 ## Quick Start
 
 1. Install dependencies:
-   - `npm install`
+  - `npm install`
 2. Create environment file:
-   - Copy `.env.example` to `.env`
-   - Set required API keys (for AI features)
+  - Copy `.env.example` to `.env`
+  - Set required API keys (for AI features)
 3. Start development server:
-   - `npm run dev`
+  - `npm run dev`
 4. Open:
-   - `http://127.0.0.1:3000`
+  - `http://127.0.0.1:3000`
 
 ## Scripts
 
@@ -72,3 +77,4 @@ Arpa is a full-stack meal planning app that combines recipe management, weekly p
 
 - Database files are intentionally ignored in Git for safer collaboration.
 - A future migration to per-user cloud data (Firebase Auth + Firestore) is planned.
+
