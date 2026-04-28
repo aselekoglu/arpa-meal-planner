@@ -1,55 +1,74 @@
 # Arpa Meal Planner
 
-A comprehensive, full-stack meal planning application designed to streamline your kitchen management. Plan your week, track your pantry, and generate smart grocery lists with ease.
+Plan meals faster, shop smarter, and waste less food.
 
-## Running Instructions
+Arpa is a full-stack meal planning app that combines recipe management, weekly planning, pantry tracking, and AI-powered helpers in one workflow.
+
+## Why Arpa
+
+- Build a weekly meal plan in minutes.
+- Auto-generate a grocery list from your plan.
+- Deduct pantry inventory with unit-aware conversions (`g`, `kg`, `ml`, `L`, `tsp`, `tbsp`, `cup`, `unit`, and more).
+- Keep ingredient naming clean with merge suggestions and bulk merge tools.
+- Speed up recipe editing with AI nutrition estimation and instruction fetching.
+
+## Feature Highlights
+
+### Meal and Recipe Management
+- Create, edit, and organize meals with ingredients, instructions, images, tags, and servings.
+- Import recipes from the web.
+- Edit meals directly from meal details.
+
+### Weekly Planner
+- Drag and drop meals into each day of the week.
+- Navigate across weeks to plan ahead.
+- Generate plans with AI support.
+
+### Grocery List + Pantry Intelligence
+- Grocery list is computed from planned meals.
+- Pantry deductions support cross-unit conversions and ingredient-specific logic.
+- Strict measure validation keeps unit data reliable for calculations.
+- Vague units are suppressed in the grocery view when concrete units exist.
+- Export grocery list to PDF.
+
+### Ingredient Name Hygiene
+- Existing ingredient names are suggested while adding/editing recipes.
+- "Merge Similar Items" helps consolidate naming variants (including manual selection).
+- Merge updates related meal ingredients and pantry rows for your current family scope.
+
+### AI Assist
+- Smart grouping by aisle/category from grocery list.
+- "Estimate Nutrition" fills per-ingredient calories/macros in recipe editing.
+- "Fetch Instructions" can pull step-by-step directions when instruction list is empty.
+- In-app assistant (Bebu Bot) can help with meal planning and cooking questions.
+
+## Quick Start
 
 1. Install dependencies:
    - `npm install`
-2. Create your local environment file:
+2. Create environment file:
    - Copy `.env.example` to `.env`
-   - Set `GEMINI_API_KEY` in `.env` (required for AI features)
-3. Start the app:
+   - Set required API keys (for AI features)
+3. Start development server:
    - `npm run dev`
-4. Open your browser:
+4. Open:
    - `http://127.0.0.1:3000`
 
-### Optional Commands
+## Scripts
+
+- `npm run dev` - Start development server
 - `npm run build` - Build production assets
-- `npm run preview` - Preview the production build
-- `npm run lint` - Type-check the project
+- `npm run preview` - Preview production build
+- `npm run lint` - Type-check and lint
 
-## Desktop Usage Instructions
+## Stack
 
-### 1. Managing Your Meals (Dashboard)
-- **View Meals**: The home screen displays your saved meals. Use the search bar or tag filters to find specific recipes.
-- **Add a Meal**: Click the **"Add Meal"** button. You can manually enter the name, ingredients, and instructions.
-- **Image Management**: In the meal form, you can add a photo by:
-  - **Uploading** a file from your computer.
-  - **Taking a photo** using your webcam (click the Camera icon).
-  - **Pasting a URL** to an image from the web.
-- **Import Recipes**: Click the **"Import"** button to find recipes from across the web. Simply enter a search query, and Bebü Bot will find and format the recipe for you.
-- **Edit/Delete**: Use the menu (three dots) on any meal card to modify or remove it.
+- Frontend: React + TypeScript + Vite
+- Backend: Node.js + Express
+- Data: SQLite (current local setup)
+- AI: Provider-based integration for planning, grouping, nutrition, and instructions
 
-### 2. Weekly Planning
-- **Navigate to Planner**: Click "Planner" in the sidebar.
-- **Manual Planning**: Drag and drop meals from the side panel onto specific days of the week.
-- **Smart Generation**: Click **"Generate Plan"** to have the AI create a balanced weekly menu based on your preferences and diet (e.g., Mediterranean, High Protein).
-- **Navigation**: Use the "Previous" and "Next" buttons to plan for future weeks.
+## Notes
 
-### 3. Grocery Lists & Pantry
-- **Grocery List**: Navigate to "Grocery List". The app automatically calculates what you need based on your weekly plan.
-- **Smart Grouping**: Click **"Smart Group"** to organize your list by supermarket aisles (Produce, Dairy, etc.).
-- **Pantry Sync**: Items you already have in your **Pantry Inventory** are automatically excluded from your shopping list.
-- **Export**: Click **"Export PDF"** to get a printable version of your shopping list.
-- **Pantry Management**: Switch to the "Pantry Inventory" tab to track what you have in stock. Adding items here keeps your grocery list accurate.
-
-### 4. Bebü Bot (AI Assistant)
-- **Chat**: Click the floating robot icon in the bottom right corner.
-- **Ask Anything**: Bebü Bot can suggest recipes based on what you have, answer cooking questions, or help you refine your meal plan. It has access to your saved meals to provide personalized advice.
-
-## Features
-- **Full-Stack Sync**: Real-time synchronization across devices for your family.
-- **Nutritional Tracking**: Automatic calculation of calories and macros for your meals.
-- **Responsive Design**: Optimized for both large desktop monitors and smaller laptop screens.
-- **Dark Mode Support**: Automatically adjusts to your system's light/dark preferences.
+- Database files are intentionally ignored in Git for safer collaboration.
+- A future migration to per-user cloud data (Firebase Auth + Firestore) is planned.
