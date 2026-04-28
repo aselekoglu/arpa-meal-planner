@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Search, Loader2, Link as LinkIcon, Globe } from 'lucide-react';
 import { Meal } from '../types';
 import { apiFetch } from '../lib/api';
+import AiProviderSelector from './AiProviderSelector';
+import { AiProviderId, defaultModelForProvider, loadAiSettings, saveAiSettings } from '../lib/ai-settings';
 
 interface ImportRecipeModalProps {
   isOpen: boolean;
@@ -13,6 +15,8 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [provider, setProvider] = useState<AiProviderId>(() => loadAiSettings().provider);
+  const [model, setModel] = useState(() => loadAiSettings().model);
 
   if (!isOpen) return null;
 
@@ -26,7 +30,11 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
       const res = await apiFetch('/api/ai/import-recipe', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify({
+          query: query.trim(),
+          provider,
+          model: model.trim() || undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -46,6 +54,21 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProviderChange = (next: AiProviderId) => {
+    const nextSettings = {
+      provider: next,
+      model: model.trim() ? model : defaultModelForProvider(next),
+    };
+    setProvider(nextSettings.provider);
+    setModel(nextSettings.model);
+    saveAiSettings(nextSettings);
+  };
+
+  const handleModelChange = (next: string) => {
+    setModel(next);
+    saveAiSettings({ provider, model: next });
   };
 
   return (
@@ -77,6 +100,15 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
           <p className="text-sm text-on-surface-variant dark:text-stone-400 leading-relaxed">
             Enter a recipe name or URL. Bebü Bot will search the web, extract ingredients, and estimate nutrition for you.
           </p>
+
+          <div>
+            <AiProviderSelector
+              provider={provider}
+              model={model}
+              onProviderChange={handleProviderChange}
+              onModelChange={handleModelChange}
+            />
+          </div>
 
           <div>
             <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline mb-2">

@@ -4,6 +4,7 @@ import {
   ExternalLink,
   Clock,
   ChefHat,
+  Edit2,
   Tag as TagIcon,
   Image as ImageIcon,
   ChevronLeft,
@@ -17,10 +18,11 @@ import { Meal } from '../types';
 interface MealDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onEdit: () => void;
   meal: Meal | null;
 }
 
-export default function MealDetailsModal({ isOpen, onClose, meal }: MealDetailsModalProps) {
+export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: MealDetailsModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
 
   if (!isOpen || !meal) return null;
@@ -98,6 +100,16 @@ export default function MealDetailsModal({ isOpen, onClose, meal }: MealDetailsM
                   View Original Recipe
                 </a>
               )}
+              <button
+                onClick={() => {
+                  onClose();
+                  onEdit();
+                }}
+                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-container/10 text-primary-container dark:bg-primary-fixed-dim/10 dark:text-primary-fixed-dim hover:opacity-90 transition-opacity font-display font-semibold text-sm"
+              >
+                <Edit2 className="w-4 h-4" />
+                Edit Meal
+              </button>
             </div>
 
             {(totalCalories > 0 || totalProtein > 0) && (

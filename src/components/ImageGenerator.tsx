@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Meal } from '../types';
 import { apiFetch } from '../lib/api';
+import AiProviderSelector from './AiProviderSelector';
+import { AiProviderId, loadAiSettings, saveAiSettings } from '../lib/ai-settings';
 
 interface ImageGeneratorProps {
   meal: Meal;
@@ -10,11 +12,18 @@ interface ImageGeneratorProps {
 }
 
 export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGeneratorProps) {
+  const initialSettings = loadAiSettings();
   const [size, setSize] = useState('1K');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [provider, setProvider] = useState<AiProviderId>('gemini');
+  const [model, setModel] = useState(() => (initialSettings.provider === 'gemini' ? initialSettings.model : ''));
 
   const handleGenerate = async () => {
+    if (provider !== 'gemini') {
+      setError('Image generation currently supports only the Google provider.');
+      return;
+    }
     setLoading(true);
     setError('');
 
@@ -22,7 +31,12 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
       const res = await apiFetch('/api/ai/generate-meal-image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mealId: meal.id, size }),
+        body: JSON.stringify({
+          mealId: meal.id,
+          size,
+          provider,
+          model: model.trim() || undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -37,6 +51,16 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProviderChange = (next: AiProviderId) => {
+    setProvider(next);
+    saveAiSettings({ provider: next, model });
+  };
+
+  const handleModelChange = (next: string) => {
+    setModel(next);
+    saveAiSettings({ provider, model: next });
   };
 
   return (
@@ -72,6 +96,16 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
             </strong>
             .
           </p>
+
+          <div>
+            <AiProviderSelector
+              provider={provider}
+              model={model}
+              onProviderChange={handleProviderChange}
+              onModelChange={handleModelChange}
+              disableImageProviders
+            />
+          </div>
 
           <div>
             <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline mb-2">

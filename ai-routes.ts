@@ -1,20 +1,69 @@
 import type { Express, Request, Response } from 'express';
 import { addDays, format, parseISO } from 'date-fns';
-import { GoogleGenAI, Type } from '@google/genai';
 import db from './db.js';
 import { getMealsWithIngredients } from './meal-queries.js';
+import { resolveProvider } from './ai/provider-resolver.js';
+import { AiProviderError, AiTaskOptions } from './ai/types.js';
 
-function geminiKey(): string {
-  const k = process.env.GEMINI_API_KEY;
-  if (!k?.trim()) {
-    throw new Error('GEMINI_API_KEY is not configured on the server');
-  }
-  return k.trim();
+type ImportedRecipe = {
+  name?: string;
+  tag?: string;
+  instructions?: string[];
+  source_url?: string;
+  image_url?: string;
+  ingredients?: Array<{
+    name: string;
+    amount: number;
+    measure: string;
+    calories: number;
+    protein: number;
+    fat: number;
+    carbs: number;
+  }>;
+};
+
+type GeneratedMealPlan = {
+  meals?: Array<{
+    name: string;
+    tag?: string;
+    ingredients?: Array<{
+      name: string;
+      amount: number;
+      measure: string;
+      calories: number;
+      protein: number;
+      fat: number;
+      carbs: number;
+    }>;
+  }>;
+};
+
+type NutritionInputIngredient = {
+  name: string;
+  amount: number;
+  measure: string;
+};
+
+type NutritionOutputIngredient = NutritionInputIngredient & {
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+
+function getTaskOptions(req: Request, task: AiTaskOptions['task'], extras: Partial<AiTaskOptions> = {}): AiTaskOptions {
+  const model = typeof req.body?.model === 'string' ? req.body.model.trim() : undefined;
+  return {
+    task,
+    ...(model ? { model } : {}),
+    ...extras,
+  };
 }
 
 function aiError(res: Response, err: unknown, fallback: string) {
   const message = err instanceof Error ? err.message : fallback;
-  const status = message.includes('GEMINI_API_KEY') ? 503 : 502;
+  const status =
+    err instanceof AiProviderError ? err.status : message.includes('GEMINI_API_KEY') ? 503 : 502;
   return res.status(status).json({ error: message });
 }
 
@@ -27,6 +76,7 @@ export function registerAiRoutes(app: Express) {
     }
 
     try {
+      const provider = resolveProvider(req.body?.provider);
       const meals = getMealsWithIngredients(familyId);
       const contextString =
         meals.length > 0
@@ -46,16 +96,10 @@ export function registerAiRoutes(app: Express) {
             )}`
           : '\n\nThe user currently has no saved meals.';
 
-      const ai = new GoogleGenAI({ apiKey: geminiKey() });
-      const chat = ai.chats.create({
-        model: 'gemini-3-flash-preview',
-        config: {
-          systemInstruction: `You are a helpful meal planning assistant. You can help users come up with recipes, meal plans, and answer questions about cooking. Use the user's meal database to suggest meals they already know how to make, or build meal plans based on their saved recipes.${contextString}`,
-        },
-      });
-
-      const response = await chat.sendMessage({ message });
-      return res.json({ text: response.text || '' });
+      const text = await provider.generateText(message, getTaskOptions(req, 'chat', {
+        systemInstruction: `You are a helpful meal planning assistant. You can help users come up with recipes, meal plans, and answer questions about cooking. Use the user's meal database to suggest meals they already know how to make, or build meal plans based on their saved recipes.${contextString}`,
+      }));
+      return res.json({ text });
     } catch (err) {
       return aiError(res, err, 'Chat failed');
     }
@@ -68,61 +112,157 @@ export function registerAiRoutes(app: Express) {
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: geminiKey() });
+      const provider = resolveProvider(req.body?.provider);
+      const supportsSearch = provider.id === 'gemini';
       const prompt = `Search for a recipe for "${query}". 
       Extract the recipe name, a suitable category/tag (e.g., Italian, Dessert, Breakfast), the list of ingredients, and step-by-step instructions.
       If the query is a URL, extract the information from that specific URL and include it as the source_url.
       If you can find a high-quality image URL for the recipe, include it as image_url.
       For each ingredient, estimate the nutritional information (calories, protein, fat, carbs) based on standard nutritional databases.
-      Return the result as a JSON object matching the provided schema.`;
+      Return only valid JSON in this exact shape:
+      {
+        "name": string,
+        "tag": string,
+        "instructions": string[],
+        "source_url": string,
+        "image_url": string,
+        "ingredients": [{ "name": string, "amount": number, "measure": string, "calories": number, "protein": number, "fat": number, "carbs": number }]
+      }${
+        supportsSearch
+          ? ''
+          : '\nIf live web search is unavailable, infer a plausible recipe from prior knowledge and set source_url to an empty string.'
+      }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          tools: [{ googleSearch: {} }],
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              name: { type: Type.STRING },
-              tag: { type: Type.STRING },
-              instructions: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING },
-                description: 'Step-by-step instructions',
-              },
-              source_url: { type: Type.STRING },
-              image_url: { type: Type.STRING },
-              ingredients: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    amount: { type: Type.NUMBER },
-                    measure: { type: Type.STRING },
-                    calories: { type: Type.NUMBER },
-                    protein: { type: Type.NUMBER },
-                    fat: { type: Type.NUMBER },
-                    carbs: { type: Type.NUMBER },
-                  },
-                  required: ['name', 'amount', 'measure', 'calories', 'protein', 'fat', 'carbs'],
-                },
-              },
-            },
-            required: ['name', 'tag', 'ingredients'],
-          },
-        },
-      });
-
-      const data = JSON.parse(response.text || '{}');
+      const data = await provider.generateJson<ImportedRecipe>(prompt, getTaskOptions(req, 'import-recipe', {
+        useWebSearch: supportsSearch,
+      }));
       if (!data.name || !data.ingredients) {
         return res.status(422).json({ error: 'Failed to parse recipe data. Please try another query.' });
       }
       return res.json(data);
     } catch (err) {
       return aiError(res, err, 'Import failed');
+    }
+  });
+
+  app.post('/api/ai/estimate-nutrition', async (req: Request, res: Response) => {
+    const mealName = typeof req.body?.mealName === 'string' ? req.body.mealName.trim() : '';
+    if (!mealName) {
+      return res.status(400).json({ error: 'mealName is required' });
+    }
+    if (!Array.isArray(req.body?.ingredients) || req.body.ingredients.length === 0) {
+      return res.status(400).json({ error: 'ingredients must be a non-empty array' });
+    }
+
+    const ingredients = (req.body.ingredients as Array<Record<string, unknown>>)
+      .map((ingredient) => ({
+        name: typeof ingredient.name === 'string' ? ingredient.name.trim() : '',
+        amount: Number(ingredient.amount),
+        measure: typeof ingredient.measure === 'string' ? ingredient.measure.trim() : '',
+      }))
+      .filter((ingredient) => ingredient.name && Number.isFinite(ingredient.amount) && ingredient.measure);
+
+    if (ingredients.length === 0) {
+      return res.status(400).json({ error: 'No valid ingredients provided' });
+    }
+
+    try {
+      const provider = resolveProvider(req.body?.provider);
+      const prompt = `Estimate nutritional values for each ingredient in the meal "${mealName}".
+Return ONLY valid JSON with this exact shape:
+{
+  "ingredients": [
+    { "name": string, "amount": number, "measure": string, "calories": number, "protein": number, "fat": number, "carbs": number }
+  ]
+}
+Use this input ingredient list and preserve each ingredient's name, amount, and measure:
+${JSON.stringify(ingredients, null, 2)}`;
+
+      const data = await provider.generateJson<{ ingredients?: Array<Record<string, unknown>> }>(
+        prompt,
+        getTaskOptions(req, 'chat')
+      );
+      const raw = Array.isArray(data.ingredients) ? data.ingredients : [];
+
+      const byName = new Map<string, NutritionOutputIngredient[]>();
+      for (const row of raw) {
+        const normalizedName = String(row.name || '').trim().toLowerCase();
+        if (!normalizedName) continue;
+        const parsed: NutritionOutputIngredient = {
+          name: String(row.name || '').trim() || normalizedName,
+          amount: Number(row.amount) || 0,
+          measure: String(row.measure || '').trim() || 'Unit',
+          calories: Math.max(0, Number(row.calories) || 0),
+          protein: Math.max(0, Number(row.protein) || 0),
+          fat: Math.max(0, Number(row.fat) || 0),
+          carbs: Math.max(0, Number(row.carbs) || 0),
+        };
+        const current = byName.get(normalizedName) ?? [];
+        current.push(parsed);
+        byName.set(normalizedName, current);
+      }
+
+      const normalized = ingredients.map((ing) => {
+        const queue = byName.get(ing.name.toLowerCase());
+        const next = queue && queue.length > 0 ? queue.shift() : undefined;
+        return {
+          name: ing.name,
+          amount: ing.amount,
+          measure: ing.measure,
+          calories: Math.max(0, Number(next?.calories) || 0),
+          protein: Math.max(0, Number(next?.protein) || 0),
+          fat: Math.max(0, Number(next?.fat) || 0),
+          carbs: Math.max(0, Number(next?.carbs) || 0),
+        };
+      });
+
+      return res.json({ ingredients: normalized });
+    } catch (err) {
+      return aiError(res, err, 'Nutrition estimation failed');
+    }
+  });
+
+  app.post('/api/ai/fetch-instructions', async (req: Request, res: Response) => {
+    const mealName = typeof req.body?.mealName === 'string' ? req.body.mealName.trim() : '';
+    if (!mealName) {
+      return res.status(400).json({ error: 'mealName is required' });
+    }
+    const sourceUrl = typeof req.body?.sourceUrl === 'string' ? req.body.sourceUrl.trim() : '';
+    const ingredients = Array.isArray(req.body?.ingredients)
+      ? (req.body.ingredients as Array<Record<string, unknown>>)
+          .map((ingredient) => String(ingredient.name || '').trim())
+          .filter(Boolean)
+      : [];
+
+    try {
+      const provider = resolveProvider(req.body?.provider);
+      const supportsSearch = provider.id === 'gemini';
+      const prompt = `Find a step-by-step recipe for "${mealName}".
+${sourceUrl ? `Prioritize this source URL: ${sourceUrl}.` : 'Use the best available public source.'}
+${ingredients.length > 0 ? `Use these ingredients as context: ${ingredients.join(', ')}.` : ''}
+Return ONLY valid JSON:
+{
+  "instructions": string[],
+  "sourceUrl": string
+}
+Ensure instructions are clear, sequential cooking steps.`;
+
+      const data = await provider.generateJson<{ instructions?: unknown[]; sourceUrl?: string }>(
+        prompt,
+        getTaskOptions(req, 'import-recipe', { useWebSearch: supportsSearch })
+      );
+      const normalizedInstructions = Array.isArray(data.instructions)
+        ? data.instructions.map((step) => String(step).trim()).filter(Boolean)
+        : [];
+      if (normalizedInstructions.length === 0) {
+        return res.status(422).json({ error: 'No instructions found for this meal' });
+      }
+      return res.json({
+        instructions: normalizedInstructions,
+        sourceUrl: typeof data.sourceUrl === 'string' ? data.sourceUrl.trim() : '',
+      });
+    } catch (err) {
+      return aiError(res, err, 'Instruction fetch failed');
     }
   });
 
@@ -142,7 +282,7 @@ export function registerAiRoutes(app: Express) {
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: geminiKey() });
+      const provider = resolveProvider(req.body?.provider);
       const prompt = `Generate a 7-day dinner meal plan for a ${diet} diet.
       Return a JSON object with a 'meals' array containing exactly 7 meals (one for each day of the week).
       Each meal must have:
@@ -157,50 +297,17 @@ export function registerAiRoutes(app: Express) {
       - 'protein': Estimated protein in grams (number)
       - 'fat': Estimated fat in grams (number)
       - 'carbs': Estimated carbs in grams (number)
-      Make sure the nutritional values are realistic and appropriate for the selected diet.`;
+      Make sure the nutritional values are realistic and appropriate for the selected diet.
+      Return only valid JSON with this shape:
+      {
+        "meals": [{
+          "name": string,
+          "tag": string,
+          "ingredients": [{ "name": string, "amount": number, "measure": string, "calories": number, "protein": number, "fat": number, "carbs": number }]
+        }]
+      }`;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              meals: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING },
-                    tag: { type: Type.STRING },
-                    ingredients: {
-                      type: Type.ARRAY,
-                      items: {
-                        type: Type.OBJECT,
-                        properties: {
-                          name: { type: Type.STRING },
-                          amount: { type: Type.NUMBER },
-                          measure: { type: Type.STRING },
-                          calories: { type: Type.NUMBER },
-                          protein: { type: Type.NUMBER },
-                          fat: { type: Type.NUMBER },
-                          carbs: { type: Type.NUMBER },
-                        },
-                        required: ['name', 'amount', 'measure', 'calories', 'protein', 'fat', 'carbs'],
-                      },
-                    },
-                  },
-                  required: ['name', 'tag', 'ingredients'],
-                },
-              },
-            },
-            required: ['meals'],
-          },
-        },
-      });
-
-      const data = JSON.parse(response.text || '{}');
+      const data = await provider.generateJson<GeneratedMealPlan>(prompt, getTaskOptions(req, 'generate-plan'));
       if (!data.meals || !Array.isArray(data.meals) || data.meals.length !== 7) {
         return res.status(422).json({ error: 'Failed to generate a complete 7-day meal plan. Please try again.' });
       }
@@ -261,23 +368,12 @@ export function registerAiRoutes(app: Express) {
     }
 
     try {
-      const ai = new GoogleGenAI({ apiKey: geminiKey() });
+      const provider = resolveProvider(req.body?.provider);
       const prompt = `Categorize these grocery items into standard supermarket aisles (e.g., Produce, Dairy, Meat, Pantry, Bakery, Frozen, Household). Return a JSON object mapping each item name to its category. Items: ${names.join(', ')}`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            description: 'Map of item name to category',
-            additionalProperties: { type: Type.STRING },
-          },
-        },
-      });
-
-      const categories = JSON.parse(response.text || '{}') as Record<string, string>;
+      const categories = await provider.generateJson<Record<string, string>>(
+        `${prompt}\nReturn only valid JSON where each key is one of the provided item names and each value is a category string.`,
+        getTaskOptions(req, 'grocery-group')
+      );
       return res.json({ categories });
     } catch (err) {
       return aiError(res, err, 'Grouping failed');
@@ -307,28 +403,12 @@ export function registerAiRoutes(app: Express) {
       .all(mealId) as { name: string }[];
 
     try {
-      const ai = new GoogleGenAI({ apiKey: geminiKey() });
+      const provider = resolveProvider(req.body?.provider);
       const prompt = `A high-quality, appetizing food photography shot of ${meal.name}, which is a ${meal.tag} dish. Ingredients include: ${ingredients.map((i) => i.name).join(', ')}. Professional lighting, shallow depth of field, delicious looking.`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.1-flash-image-preview',
-        contents: prompt,
-        config: {
-          imageConfig: {
-            aspectRatio: '1:1',
-            imageSize: size || '1K',
-          },
-        },
-      });
-
-      let imageUrl: string | null = null;
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          const base64EncodeString = part.inlineData.data;
-          imageUrl = `data:image/png;base64,${base64EncodeString}`;
-          break;
-        }
-      }
+      const imageUrl = await provider.generateImage(
+        prompt,
+        getTaskOptions(req, 'generate-meal-image', { size })
+      );
 
       if (!imageUrl) {
         return res.status(422).json({ error: 'Failed to generate image' });

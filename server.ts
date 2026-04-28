@@ -4,6 +4,7 @@ import { createServer as createViteServer } from 'vite';
 import db from './db.js';
 import { getMealsWithIngredients } from './meal-queries.js';
 import { registerAiRoutes } from './ai-routes.js';
+import { convertAmount, isApprovedMeasureLabel, normalizeIngredientName } from './src/lib/units.js';
 
 const MAX_NAME_LEN = 500;
 const MAX_TAG_LEN = 200;
@@ -39,6 +40,11 @@ type SanitizedMeal = {
   image_url: string | null;
   instructionsStr: string | null;
   ingredients: SanitizedIngredient[];
+};
+
+type SanitizedMergePayload = {
+  sourceNames: string[];
+  targetName: string;
 };
 
 function validateMealBody(body: unknown): { ok: true; data: SanitizedMeal } | { ok: false; error: string } {
@@ -107,7 +113,7 @@ function validateMealBody(body: unknown): { ok: true; data: SanitizedMeal } | { 
       }
       const amount = Number(ing.amount);
       const measure = typeof ing.measure === 'string' ? ing.measure.trim() : '';
-      if (!Number.isFinite(amount) || !measure || measure.length > 100) {
+      if (!Number.isFinite(amount) || !measure || !isApprovedMeasureLabel(measure)) {
         return { ok: false, error: 'Invalid ingredient amount or measure' };
       }
       ingredients.push({
@@ -135,6 +141,51 @@ function validateMealBody(body: unknown): { ok: true; data: SanitizedMeal } | { 
   };
 }
 
+function validateMergePayload(
+  body: unknown
+): { ok: true; data: SanitizedMergePayload } | { ok: false; error: string } {
+  if (!body || typeof body !== 'object') {
+    return { ok: false, error: 'Invalid JSON body' };
+  }
+
+  const b = body as Record<string, unknown>;
+  const targetName = typeof b.targetName === 'string' ? b.targetName.trim() : '';
+  if (!targetName || targetName.length > 200) {
+    return { ok: false, error: 'targetName is required' };
+  }
+
+  if (!Array.isArray(b.sourceNames)) {
+    return { ok: false, error: 'sourceNames must be an array' };
+  }
+
+  const uniqueSourceNames: string[] = [];
+  const seen = new Set<string>();
+
+  for (const raw of b.sourceNames) {
+    if (typeof raw !== 'string') continue;
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.length > 200) continue;
+    const exactKey = trimmed;
+    if (seen.has(exactKey)) continue;
+    seen.add(exactKey);
+    uniqueSourceNames.push(trimmed);
+  }
+
+  if (uniqueSourceNames.length < 2) {
+    return { ok: false, error: 'Select at least 2 names to merge' };
+  }
+
+  const normalizedTarget = normalizeIngredientName(targetName);
+  const targetIsSelected = uniqueSourceNames.some(
+    (name) => normalizeIngredientName(name) === normalizedTarget
+  );
+  if (!targetIsSelected) {
+    return { ok: false, error: 'targetName must be one of sourceNames' };
+  }
+
+  return { ok: true, data: { sourceNames: uniqueSourceNames, targetName } };
+}
+
 async function startServer() {
   const app = express();
   const PORT = Number(process.env.PORT) || 3000;
@@ -152,7 +203,9 @@ async function startServer() {
     const familyId = parseFamilyId(req);
     const parsed = validateMealBody(req.body);
     if (!parsed.ok) {
-      return res.status(400).json({ error: parsed.error });
+      return res
+        .status(400)
+        .json({ error: 'error' in parsed ? parsed.error : 'Invalid meal payload' });
     }
     const { name, tag, source_url, image_url, instructionsStr, ingredients } = parsed.data;
 
@@ -198,7 +251,9 @@ async function startServer() {
 
     const parsed = validateMealBody(req.body);
     if (!parsed.ok) {
-      return res.status(400).json({ error: parsed.error });
+      return res
+        .status(400)
+        .json({ error: 'error' in parsed ? parsed.error : 'Invalid meal payload' });
     }
     const { name, tag, source_url, image_url, instructionsStr, ingredients } = parsed.data;
 
@@ -329,9 +384,12 @@ async function startServer() {
       return res.status(400).json({ error: 'name is required' });
     }
     const amt = Number(amount);
-    const meas = typeof measure === 'string' && measure.trim() ? measure.trim().slice(0, 100) : 'Unit';
+    const meas = typeof measure === 'string' ? measure.trim() : '';
     if (!Number.isFinite(amt)) {
       return res.status(400).json({ error: 'Invalid amount' });
+    }
+    if (!meas || !isApprovedMeasureLabel(meas)) {
+      return res.status(400).json({ error: 'Invalid measure. Please select an approved unit.' });
     }
     try {
       const result = db
@@ -340,6 +398,106 @@ async function startServer() {
       res.json({ id: result.lastInsertRowid, success: true });
     } catch {
       res.status(500).json({ error: 'Failed to add to pantry' });
+    }
+  });
+
+  app.post('/api/ingredients/merge-names', (req, res) => {
+    const familyId = parseFamilyId(req);
+    const parsed = validateMergePayload(req.body);
+    if (!parsed.ok) {
+      return res
+        .status(400)
+        .json({ error: 'error' in parsed ? parsed.error : 'Invalid merge payload' });
+    }
+
+    const { sourceNames, targetName } = parsed.data;
+    const placeholders = sourceNames.map(() => '?').join(', ');
+
+    const mergeTransaction = db.transaction(() => {
+      const updateIngredients = db
+        .prepare(
+          `
+          UPDATE ingredients
+          SET name = ?
+          WHERE name IN (${placeholders})
+            AND meal_id IN (SELECT id FROM meals WHERE family_id = ?)
+          `
+        )
+        .run(targetName, ...sourceNames, familyId);
+
+      const updatePantry = db
+        .prepare(
+          `
+          UPDATE pantry
+          SET name = ?
+          WHERE family_id = ?
+            AND name IN (${placeholders})
+          `
+        )
+        .run(targetName, familyId, ...sourceNames);
+
+      type PantryRow = { id: number; amount: number; measure: string };
+      const renamedPantryRows = db
+        .prepare('SELECT id, amount, measure FROM pantry WHERE family_id = ? AND name = ? ORDER BY id ASC')
+        .all(familyId, targetName) as PantryRow[];
+
+      type PantryCluster = { keepId: number; measure: string; totalAmount: number; deleteIds: number[] };
+      const clusters: PantryCluster[] = [];
+
+      for (const row of renamedPantryRows) {
+        let merged = false;
+        for (const cluster of clusters) {
+          const converted = convertAmount(row.amount, row.measure, cluster.measure, targetName);
+          if (converted === null) continue;
+          cluster.totalAmount += converted;
+          cluster.deleteIds.push(row.id);
+          merged = true;
+          break;
+        }
+
+        if (!merged) {
+          clusters.push({
+            keepId: row.id,
+            measure: row.measure,
+            totalAmount: row.amount,
+            deleteIds: [],
+          });
+        }
+      }
+
+      const updatePantryAmount = db.prepare(
+        'UPDATE pantry SET name = ?, amount = ?, measure = ? WHERE id = ? AND family_id = ?'
+      );
+      const deletePantryRows = db.prepare('DELETE FROM pantry WHERE id = ? AND family_id = ?');
+
+      let consolidatedPantryRows = 0;
+      for (const cluster of clusters) {
+        updatePantryAmount.run(
+          targetName,
+          Number(cluster.totalAmount.toFixed(4)),
+          cluster.measure,
+          cluster.keepId,
+          familyId
+        );
+        for (const deleteId of cluster.deleteIds) {
+          const result = deletePantryRows.run(deleteId, familyId);
+          consolidatedPantryRows += result.changes;
+        }
+      }
+
+      return {
+        updatedIngredientRows: updateIngredients.changes,
+        updatedPantryRows: updatePantry.changes,
+        consolidatedPantryRows,
+      };
+    });
+
+    try {
+      const result = mergeTransaction();
+      res.json({ success: true, ...result });
+    } catch (error) {
+      console.error('Failed to merge ingredient names', error);
+      res.status(500).json({ error: 'Failed to merge ingredient names' });
     }
   });
 

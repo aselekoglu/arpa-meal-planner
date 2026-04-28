@@ -164,6 +164,10 @@ export default function MealCard({ meal, onDelete, onEdit }: MealCardProps) {
       <MealDetailsModal
         isOpen={showDetails}
         onClose={() => setShowDetails(false)}
+        onEdit={() => {
+          setShowDetails(false);
+          onEdit();
+        }}
         meal={meal}
       />
     </>

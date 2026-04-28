@@ -1,5 +1,19 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Tag as TagIcon, Utensils, Globe, ArrowRight, Sparkles, ArrowUpRight, Clock, AlertTriangle, Bell } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Tag as TagIcon,
+  Utensils,
+  Globe,
+  ArrowRight,
+  Sparkles,
+  ArrowUpRight,
+  Clock,
+  AlertTriangle,
+  Bell,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Meal, PlannerItem, PantryItem } from '../types';
 import MealCard from '../components/MealCard';
@@ -19,6 +33,7 @@ export default function Dashboard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | Partial<Meal> | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const fetchMeals = async () => {
     try {
@@ -57,6 +72,16 @@ export default function Dashboard() {
   }, []);
 
   const tags = Array.from(new Set(meals.map((m) => m.tag).filter(Boolean)));
+  const ingredientNameSuggestions = Array.from(
+    new Map(
+      [
+        ...meals.flatMap((meal) => meal.ingredients.map((ingredient) => ingredient.name?.trim() || '')),
+        ...pantryItems.map((item) => item.name?.trim() || ''),
+      ]
+        .filter(Boolean)
+        .map((name) => [name.toLowerCase(), name] as const),
+    ).values(),
+  ).sort((a, b) => a.localeCompare(b));
 
   const filteredMeals = meals.filter((meal) => {
     const matchesSearch = meal.name.toLowerCase().includes(search.toLowerCase());
@@ -64,7 +89,8 @@ export default function Dashboard() {
     return matchesSearch && matchesTag;
   });
 
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const weekEnd = addDays(weekStart, 6);
   const weekDates = Array.from({ length: 7 }).map((_, i) => format(addDays(weekStart, i), 'yyyy-MM-dd'));
 
   const weekMeals = plannerItems
@@ -134,10 +160,35 @@ export default function Dashboard() {
             Welcome back, Gourmet.
           </h1>
           <p className="text-on-surface-variant dark:text-stone-400 mt-2 font-medium">
-            Your culinary journey for the week of {format(weekStart, 'MMM do')} is curated.
+            Nutrition and meals for {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 items-center">
+          <div className="flex items-center gap-2 bg-surface-container-low dark:bg-stone-900 rounded-full p-1.5">
+            <button
+              onClick={() => setSelectedDate(addDays(selectedDate, -7))}
+              className="p-2 rounded-full hover:bg-surface-container-lowest dark:hover:bg-stone-800 transition-colors active:scale-90"
+              aria-label="Previous week"
+            >
+              <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
+            </button>
+            <div className="px-3 text-sm font-display font-semibold text-on-surface dark:text-stone-100 whitespace-nowrap">
+              {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
+            </div>
+            <button
+              onClick={() => setSelectedDate(addDays(selectedDate, 7))}
+              className="p-2 rounded-full hover:bg-surface-container-lowest dark:hover:bg-stone-800 transition-colors active:scale-90"
+              aria-label="Next week"
+            >
+              <ChevronRight className="w-4 h-4 text-on-surface-variant" />
+            </button>
+          </div>
+          <button
+            onClick={() => setSelectedDate(new Date())}
+            className="px-4 py-3 bg-surface-container-highest dark:bg-stone-800 hover:bg-surface-dim dark:hover:bg-stone-700 text-on-surface dark:text-stone-200 font-display font-semibold text-sm rounded-full transition-colors active:scale-95"
+          >
+            Current Week
+          </button>
           <button
             onClick={() => setIsImportModalOpen(true)}
             className="px-5 py-3 bg-surface-container-highest dark:bg-stone-800 hover:bg-surface-dim dark:hover:bg-stone-700 text-on-surface dark:text-stone-200 font-display font-semibold text-sm rounded-full flex items-center gap-2 transition-colors active:scale-95"
@@ -426,6 +477,7 @@ export default function Dashboard() {
             fetchMeals();
           }}
           editingMeal={editingMeal}
+          ingredientNameSuggestions={ingredientNameSuggestions}
         />
       )}
 

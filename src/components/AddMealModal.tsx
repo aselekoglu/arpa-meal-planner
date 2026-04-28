@@ -4,6 +4,8 @@ import {
   Plus,
   Trash2,
   Save,
+  Sparkles,
+  Loader2,
   Camera,
   Upload,
   Link as LinkIcon,
@@ -12,12 +14,15 @@ import {
 } from 'lucide-react';
 import { Meal, Ingredient } from '../types';
 import { apiFetch } from '../lib/api';
+import { APPROVED_MEASURE_LABELS } from '../lib/units';
+import { loadAiSettings } from '../lib/ai-settings';
 
 interface AddMealModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
   editingMeal?: Meal | Partial<Meal> | null;
+  ingredientNameSuggestions?: string[];
 }
 
 export default function AddMealModal({
@@ -25,6 +30,7 @@ export default function AddMealModal({
   onClose,
   onSave,
   editingMeal,
+  ingredientNameSuggestions = [],
 }: AddMealModalProps) {
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
@@ -35,8 +41,15 @@ export default function AddMealModal({
     { name: '', amount: 1, measure: 'Unit', calories: 0, protein: 0, fat: 0, carbs: 0 },
   ]);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isEstimatingNutrition, setIsEstimatingNutrition] = useState(false);
+  const [nutritionError, setNutritionError] = useState<string | null>(null);
+  const [nutritionInfo, setNutritionInfo] = useState<string | null>(null);
+  const [isFetchingInstructions, setIsFetchingInstructions] = useState(false);
+  const [instructionsError, setInstructionsError] = useState<string | null>(null);
+  const [instructionsInfo, setInstructionsInfo] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { provider, model } = loadAiSettings();
 
   useEffect(() => {
     if (editingMeal) {
@@ -141,6 +154,124 @@ export default function AddMealModal({
     const newIngredients = [...ingredients];
     newIngredients[index] = { ...newIngredients[index], [field]: value };
     setIngredients(newIngredients);
+  };
+
+  const validIngredients = ingredients
+    .map((ingredient) => ({
+      name: (ingredient.name || '').trim(),
+      amount: Number(ingredient.amount),
+      measure: (ingredient.measure || '').trim(),
+    }))
+    .filter((ingredient) => ingredient.name && Number.isFinite(ingredient.amount) && ingredient.measure);
+
+  const canEstimateNutrition = validIngredients.length > 0 && !isEstimatingNutrition;
+  const hasAnyInstructions = instructions.some((step) => step.trim().length > 0);
+  const canFetchInstructions = name.trim().length > 0 && !hasAnyInstructions && !isFetchingInstructions;
+
+  const handleEstimateNutrition = async () => {
+    setNutritionError(null);
+    setNutritionInfo(null);
+    if (!canEstimateNutrition) return;
+
+    setIsEstimatingNutrition(true);
+    try {
+      const res = await apiFetch('/api/ai/estimate-nutrition', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mealName: name.trim() || 'Untitled meal',
+          ingredients: validIngredients,
+          provider,
+          model: model.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error || 'Failed to estimate nutrition');
+      }
+
+      const estimated = Array.isArray((data as { ingredients?: unknown[] }).ingredients)
+        ? ((data as { ingredients: Array<Record<string, unknown>> }).ingredients ?? [])
+        : [];
+
+      setIngredients((prev) => {
+        const next = [...prev];
+        const used = new Set<number>();
+        for (let i = 0; i < next.length; i += 1) {
+          const baseName = (next[i].name || '').trim().toLowerCase();
+          const foundIdx = estimated.findIndex(
+            (item, idx) => !used.has(idx) && String(item.name || '').trim().toLowerCase() === baseName,
+          );
+          const fallbackIdx = foundIdx >= 0 ? foundIdx : estimated.findIndex((_, idx) => !used.has(idx));
+          if (fallbackIdx < 0) continue;
+          used.add(fallbackIdx);
+          const item = estimated[fallbackIdx];
+          next[i] = {
+            ...next[i],
+            calories: Math.max(0, Number(item.calories) || 0),
+            protein: Math.max(0, Number(item.protein) || 0),
+            fat: Math.max(0, Number(item.fat) || 0),
+            carbs: Math.max(0, Number(item.carbs) || 0),
+          };
+        }
+        return next;
+      });
+
+      setNutritionInfo('Nutrition fields updated from AI estimates.');
+    } catch (error) {
+      setNutritionError(error instanceof Error ? error.message : 'Failed to estimate nutrition');
+    } finally {
+      setIsEstimatingNutrition(false);
+    }
+  };
+
+  const handleFetchInstructions = async () => {
+    setInstructionsError(null);
+    setInstructionsInfo(null);
+    if (!canFetchInstructions) {
+      if (hasAnyInstructions) {
+        setInstructionsError('Instructions already exist. Clear them first to fetch replacements.');
+      }
+      return;
+    }
+
+    setIsFetchingInstructions(true);
+    try {
+      const res = await apiFetch('/api/ai/fetch-instructions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mealName: name.trim(),
+          sourceUrl: sourceUrl.trim() || undefined,
+          ingredients: validIngredients,
+          provider,
+          model: model.trim() || undefined,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error((data as { error?: string }).error || 'Failed to fetch instructions');
+      }
+
+      const nextInstructions = Array.isArray((data as { instructions?: unknown[] }).instructions)
+        ? ((data as { instructions: unknown[] }).instructions
+            .map((step) => String(step).trim())
+            .filter(Boolean))
+        : [];
+      if (nextInstructions.length === 0) {
+        throw new Error('No instructions were returned.');
+      }
+      setInstructions(nextInstructions);
+      if (typeof (data as { sourceUrl?: unknown }).sourceUrl === 'string') {
+        const nextSourceUrl = (data as { sourceUrl: string }).sourceUrl.trim();
+        if (nextSourceUrl) setSourceUrl(nextSourceUrl);
+      }
+      setInstructionsInfo('Instructions fetched successfully.');
+    } catch (error) {
+      setInstructionsError(error instanceof Error ? error.message : 'Failed to fetch instructions');
+    } finally {
+      setIsFetchingInstructions(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -341,14 +472,31 @@ export default function AddMealModal({
             <div>
               <div className="flex justify-between items-center mb-3">
                 <label className={fieldLabel + ' mb-0'}>Instructions</label>
-                <button
-                  type="button"
-                  onClick={() => setInstructions([...instructions, ''])}
-                  className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim hover:underline inline-flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Step
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleFetchInstructions}
+                    disabled={!canFetchInstructions}
+                    className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim hover:underline inline-flex items-center gap-1 disabled:opacity-50 disabled:no-underline"
+                  >
+                    {isFetchingInstructions ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    Fetch Instructions
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInstructions([...instructions, ''])}
+                    className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim hover:underline inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Step
+                  </button>
+                </div>
               </div>
+              {instructionsError && <p className="text-xs text-secondary mb-2">{instructionsError}</p>}
+              {instructionsInfo && <p className="text-xs text-primary-container mb-2">{instructionsInfo}</p>}
 
               <div className="space-y-3">
                 {instructions.map((step, index) => (
@@ -389,14 +537,31 @@ export default function AddMealModal({
             <div>
               <div className="flex justify-between items-center mb-3">
                 <label className={fieldLabel + ' mb-0'}>Ingredients</label>
-                <button
-                  type="button"
-                  onClick={handleAddIngredient}
-                  className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim hover:underline inline-flex items-center gap-1"
-                >
-                  <Plus className="w-3.5 h-3.5" /> Add Ingredient
-                </button>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={handleEstimateNutrition}
+                    disabled={!canEstimateNutrition}
+                    className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim hover:underline inline-flex items-center gap-1 disabled:opacity-50 disabled:no-underline"
+                  >
+                    {isEstimatingNutrition ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                    Estimate Nutrition
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleAddIngredient}
+                    className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim hover:underline inline-flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Add Ingredient
+                  </button>
+                </div>
               </div>
+              {nutritionError && <p className="text-xs text-secondary mb-2">{nutritionError}</p>}
+              {nutritionInfo && <p className="text-xs text-primary-container mb-2">{nutritionInfo}</p>}
 
               <div className="space-y-3">
                 {ingredients.map((ing, index) => (
@@ -411,7 +576,13 @@ export default function AddMealModal({
                         value={ing.name || ''}
                         onChange={(e) => handleIngredientChange(index, 'name', e.target.value)}
                         className={`${inputClass} flex-1 min-w-[160px]`}
+                        list="ingredient-name-suggestions"
                       />
+                      <datalist id="ingredient-name-suggestions">
+                        {ingredientNameSuggestions.map((name) => (
+                          <option key={name} value={name} />
+                        ))}
+                      </datalist>
                       <input
                         type="number"
                         min="0"
@@ -423,25 +594,17 @@ export default function AddMealModal({
                         }
                         className={`${inputClass} w-24`}
                       />
-                      <input
-                        type="text"
-                        placeholder="Measure"
-                        value={ing.measure || ''}
-                        onChange={(e) =>
-                          handleIngredientChange(index, 'measure', e.target.value)
-                        }
-                        className={`${inputClass} w-32`}
-                        list="measures"
-                      />
-                      <datalist id="measures">
-                        <option value="Gram (g)" />
-                        <option value="Unit" />
-                        <option value="Cup (c)" />
-                        <option value="Tablespoon (Tbsp)" />
-                        <option value="Teaspoon (tsp)" />
-                        <option value="Bebu (be)" />
-                        <option value="Cay Bardagi" />
-                      </datalist>
+                      <select
+                        value={ing.measure || 'Unit'}
+                        onChange={(e) => handleIngredientChange(index, 'measure', e.target.value)}
+                        className={`${inputClass} w-40`}
+                      >
+                        {APPROVED_MEASURE_LABELS.map((unitLabel) => (
+                          <option key={unitLabel} value={unitLabel}>
+                            {unitLabel}
+                          </option>
+                        ))}
+                      </select>
                       <button
                         type="button"
                         onClick={() => handleRemoveIngredient(index)}

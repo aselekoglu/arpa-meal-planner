@@ -2,6 +2,8 @@ import { useState, useRef, useEffect } from 'react';
 import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles } from 'lucide-react';
 import Markdown from 'react-markdown';
 import { apiFetch } from '../lib/api';
+import AiProviderSelector from './AiProviderSelector';
+import { AiProviderId, defaultModelForProvider, loadAiSettings, saveAiSettings } from '../lib/ai-settings';
 
 interface Message {
   role: 'user' | 'model';
@@ -18,6 +20,8 @@ export default function Chatbot() {
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [provider, setProvider] = useState<AiProviderId>(() => loadAiSettings().provider);
+  const [model, setModel] = useState(() => loadAiSettings().model);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -40,7 +44,11 @@ export default function Chatbot() {
       const res = await apiFetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMessage }),
+        body: JSON.stringify({
+          message: userMessage,
+          provider,
+          model: model.trim() || undefined,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -60,6 +68,21 @@ export default function Chatbot() {
       e.preventDefault();
       handleSend();
     }
+  };
+
+  const handleProviderChange = (next: AiProviderId) => {
+    const nextSettings = {
+      provider: next,
+      model: model.trim() ? model : defaultModelForProvider(next),
+    };
+    setProvider(nextSettings.provider);
+    setModel(nextSettings.model);
+    saveAiSettings(nextSettings);
+  };
+
+  const handleModelChange = (next: string) => {
+    setModel(next);
+    saveAiSettings({ provider, model: next });
   };
 
   return (
@@ -141,6 +164,14 @@ export default function Chatbot() {
         </div>
 
         <div className="p-3 bg-surface dark:bg-stone-900 border-t border-outline-variant/20 dark:border-stone-800">
+          <div className="mb-3">
+            <AiProviderSelector
+              provider={provider}
+              model={model}
+              onProviderChange={handleProviderChange}
+              onModelChange={handleModelChange}
+            />
+          </div>
           <div className="flex gap-2 relative">
             <textarea
               value={input}

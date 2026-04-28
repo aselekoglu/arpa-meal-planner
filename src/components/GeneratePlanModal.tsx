@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, Sparkles, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { apiFetch } from '../lib/api';
+import AiProviderSelector from './AiProviderSelector';
+import { AiProviderId, defaultModelForProvider, loadAiSettings, saveAiSettings } from '../lib/ai-settings';
 
 interface GeneratePlanModalProps {
   isOpen: boolean;
@@ -30,6 +32,8 @@ export default function GeneratePlanModal({
   const [diet, setDiet] = useState(DIET_OPTIONS[0]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [provider, setProvider] = useState<AiProviderId>(() => loadAiSettings().provider);
+  const [model, setModel] = useState(() => loadAiSettings().model);
 
   if (!isOpen) return null;
 
@@ -44,6 +48,8 @@ export default function GeneratePlanModal({
         body: JSON.stringify({
           startDate: format(startDate, 'yyyy-MM-dd'),
           diet,
+          provider,
+          model: model.trim() || undefined,
         }),
       });
       const data = await res.json().catch(() => ({}));
@@ -60,6 +66,21 @@ export default function GeneratePlanModal({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleProviderChange = (next: AiProviderId) => {
+    const nextSettings = {
+      provider: next,
+      model: model.trim() ? model : defaultModelForProvider(next),
+    };
+    setProvider(nextSettings.provider);
+    setModel(nextSettings.model);
+    saveAiSettings(nextSettings);
+  };
+
+  const handleModelChange = (next: string) => {
+    setModel(next);
+    saveAiSettings({ provider, model: next });
   };
 
   return (
@@ -95,6 +116,15 @@ export default function GeneratePlanModal({
             </strong>
             .
           </p>
+
+          <div>
+            <AiProviderSelector
+              provider={provider}
+              model={model}
+              onProviderChange={handleProviderChange}
+              onModelChange={handleModelChange}
+            />
+          </div>
 
           <div>
             <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline mb-2">
