@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useReducer } from 'react';
 import {
   Plus,
   Search,
@@ -14,17 +14,32 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Meal, PlannerItem, PantryItem } from '../types';
 import MealCard from '../components/MealCard';
+import MealDetailsModal from '../components/MealDetailsModal';
 import AddMealModal from '../components/AddMealModal';
 import ImportRecipeModal from '../components/ImportRecipeModal';
 import { apiFetch } from '../lib/api';
 import { addDays, format, startOfWeek } from 'date-fns';
+import {
+  getScaledIngredients,
+  getScaledMealNutritionTotals,
+  resolveEffectiveServings,
+} from '../lib/meal-scaling';
+import {
+  isAiJobNavigationState,
+  mergeMealForRestore,
+  type AiJobNavigationState,
+} from '../lib/ai-job-nav-state';
+import { loadDefaultServings, loadWeekStartsOn } from '../lib/preferences';
 
-const DAY_LABELS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_LABELS_MON = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DAY_LABELS_SUN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export default function Dashboard() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [plannerItems, setPlannerItems] = useState<PlannerItem[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
@@ -33,7 +48,29 @@ export default function Dashboard() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [editingMeal, setEditingMeal] = useState<Meal | Partial<Meal> | null>(null);
+  const [detailMeal, setDetailMeal] = useState<Meal | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [scrollAddMealToIngredients, setScrollAddMealToIngredients] = useState(false);
+
+  const [, bumpPrefs] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    const onPrefs = () => bumpPrefs();
+    window.addEventListener('arpa-preferences-updated', onPrefs);
+    return () => window.removeEventListener('arpa-preferences-updated', onPrefs);
+  }, []);
+
+  useEffect(() => {
+    const raw = location.state as AiJobNavigationState | null | undefined;
+    if (!raw || !isAiJobNavigationState(raw) || !raw.addMealRestore) return;
+
+    const { mealId, partial, scrollToIngredients } = raw.addMealRestore;
+    const base = mealId != null ? meals.find((m) => m.id === mealId) ?? null : null;
+    const merged = mergeMealForRestore(base, partial);
+    setEditingMeal(merged);
+    setIsAddModalOpen(true);
+    setScrollAddMealToIngredients(Boolean(scrollToIngredients));
+    navigate('.', { replace: true, state: {} });
+  }, [location.state, meals, navigate]);
 
   const fetchMeals = async () => {
     try {
@@ -89,7 +126,9 @@ export default function Dashboard() {
     return matchesSearch && matchesTag;
   });
 
-  const weekStart = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  const weekStartsOn = loadWeekStartsOn();
+  const weekStart = startOfWeek(selectedDate, { weekStartsOn });
+  const dayLabels = weekStartsOn === 0 ? DAY_LABELS_SUN : DAY_LABELS_MON;
   const weekEnd = addDays(weekStart, 6);
   const weekDates = Array.from({ length: 7 }).map((_, i) => format(addDays(weekStart, i), 'yyyy-MM-dd'));
 
@@ -97,24 +136,39 @@ export default function Dashboard() {
     .filter((item) => weekDates.includes(item.date))
     .map((item) => {
       const meal = meals.find((m) => m.id === item.meal_id);
-      return meal ? { meal, dayIndex: weekDates.indexOf(item.date) } : null;
+      return meal
+        ? {
+            meal,
+            plannerItem: item,
+            dayIndex: weekDates.indexOf(item.date),
+            effectiveServings: resolveEffectiveServings(meal, item.servings_override),
+          }
+        : null;
     })
-    .filter((m): m is { meal: Meal; dayIndex: number } => Boolean(m));
+    .filter(
+      (
+        m,
+      ): m is { meal: Meal; plannerItem: PlannerItem; dayIndex: number; effectiveServings: number } =>
+        Boolean(m),
+    );
 
   const previewMeals = (
     weekMeals.length > 0
       ? weekMeals.slice(0, 6)
-      : meals.slice(0, 6).map((meal, i) => ({ meal, dayIndex: i % 7 }))
+      : meals.slice(0, 6).map((meal, i) => ({
+          meal,
+          dayIndex: i % 7,
+          effectiveServings: resolveEffectiveServings(meal, null),
+        }))
   );
 
   const summary = weekMeals.reduce(
-    (acc, { meal }) => {
-      meal.ingredients.forEach((ing) => {
-        acc.calories += ing.calories || 0;
-        acc.protein += ing.protein || 0;
-        acc.carbs += ing.carbs || 0;
-        acc.fat += ing.fat || 0;
-      });
+    (acc, { meal, effectiveServings }) => {
+      const totals = getScaledMealNutritionTotals(meal, effectiveServings);
+      acc.calories += totals.calories;
+      acc.protein += totals.protein;
+      acc.carbs += totals.carbs;
+      acc.fat += totals.fat;
       return acc;
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
@@ -131,7 +185,7 @@ export default function Dashboard() {
 
   const pantryLookup = new Set(pantryItems.map((item) => item.name.toLowerCase()));
   const groceryPreview = weekMeals
-    .flatMap(({ meal }) => meal.ingredients)
+    .flatMap(({ meal, effectiveServings }) => getScaledIngredients(meal, effectiveServings))
     .filter((ing) => !pantryLookup.has(ing.name.toLowerCase()))
     .slice(0, 6);
   const pantryAlerts = pantryItems.filter((item) => item.amount <= 1).slice(0, 3);
@@ -159,25 +213,25 @@ export default function Dashboard() {
           <h1 className="text-3xl md:text-4xl xl:text-5xl font-display font-extrabold tracking-tight text-primary-container dark:text-primary-fixed-dim">
             Welcome back, Gourmet.
           </h1>
-          <p className="text-on-surface-variant dark:text-stone-400 mt-2 font-medium">
+          <p className="text-on-surface-variant mt-2 font-medium">
             Nutrition and meals for {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}.
           </p>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
-          <div className="flex items-center gap-2 bg-surface-container-low dark:bg-stone-900 rounded-full p-1.5">
+          <div className="flex items-center gap-2 bg-surface-container-low rounded-full p-1.5">
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, -7))}
-              className="p-2 rounded-full hover:bg-surface-container-lowest dark:hover:bg-stone-800 transition-colors active:scale-90"
+              className="p-2 rounded-full hover:bg-surface-container-lowest transition-colors active:scale-90"
               aria-label="Previous week"
             >
               <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
             </button>
-            <div className="px-3 text-sm font-display font-semibold text-on-surface dark:text-stone-100 whitespace-nowrap">
+            <div className="px-3 text-sm font-display font-semibold text-on-surface whitespace-nowrap">
               {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
             </div>
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, 7))}
-              className="p-2 rounded-full hover:bg-surface-container-lowest dark:hover:bg-stone-800 transition-colors active:scale-90"
+              className="p-2 rounded-full hover:bg-surface-container-lowest transition-colors active:scale-90"
               aria-label="Next week"
             >
               <ChevronRight className="w-4 h-4 text-on-surface-variant" />
@@ -185,13 +239,13 @@ export default function Dashboard() {
           </div>
           <button
             onClick={() => setSelectedDate(new Date())}
-            className="px-4 py-3 bg-surface-container-highest dark:bg-stone-800 hover:bg-surface-dim dark:hover:bg-stone-700 text-on-surface dark:text-stone-200 font-display font-semibold text-sm rounded-full transition-colors active:scale-95"
+            className="px-4 py-3 bg-surface-container-highest hover:bg-surface-container-high text-on-surface font-display font-semibold text-sm rounded-full transition-colors active:scale-95"
           >
             Current Week
           </button>
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="px-5 py-3 bg-surface-container-highest dark:bg-stone-800 hover:bg-surface-dim dark:hover:bg-stone-700 text-on-surface dark:text-stone-200 font-display font-semibold text-sm rounded-full flex items-center gap-2 transition-colors active:scale-95"
+            className="px-5 py-3 bg-surface-container-highest hover:bg-surface-container-high text-on-surface font-display font-semibold text-sm rounded-full flex items-center gap-2 transition-colors active:scale-95"
           >
             <Globe className="w-4 h-4" />
             Import Recipe
@@ -236,12 +290,12 @@ export default function Dashboard() {
             </div>
             {previewMeals.length > 0 ? (
               <div className="flex gap-5 overflow-x-auto pb-3 hide-scrollbar -mx-5 px-5 lg:mx-0 lg:px-0 snap-x snap-mandatory">
-                {previewMeals.map(({ meal, dayIndex }) => (
+                {previewMeals.map(({ meal, dayIndex, effectiveServings }) => (
                   <article
                     key={meal.id}
-                    className="min-w-[260px] sm:min-w-[280px] snap-start bg-surface-container-lowest dark:bg-stone-900 rounded-[2rem] overflow-hidden border border-outline-variant/15 dark:border-stone-800 group"
+                    className="min-w-[260px] sm:min-w-[280px] snap-start bg-surface-container-lowest rounded-[2rem] overflow-hidden border border-outline-variant/15 group"
                   >
-                    <div className="relative h-40 bg-surface-container-high dark:bg-stone-800 overflow-hidden">
+                    <div className="relative h-40 bg-surface-container-high overflow-hidden">
                       {meal.image_url ? (
                         <img
                           src={meal.image_url}
@@ -261,11 +315,11 @@ export default function Dashboard() {
                             : 'bg-surface-container-highest text-primary-container'
                         }`}
                       >
-                        {DAY_LABELS[dayIndex] ?? 'Today'}
+                        {dayLabels[dayIndex] ?? 'Today'}
                       </div>
                     </div>
                     <div className="p-5">
-                      <h4 className="font-display font-bold text-on-surface dark:text-stone-100 mb-1 leading-tight">
+                      <h4 className="font-display font-bold text-on-surface mb-1 leading-tight">
                         {meal.name}
                       </h4>
                       <div className="flex flex-wrap gap-1.5 mb-3">
@@ -276,22 +330,23 @@ export default function Dashboard() {
                         )}
                         <span className="text-[10px] px-2 py-0.5 bg-surface-container-high text-on-surface-variant rounded-full font-bold inline-flex items-center gap-1">
                           <Clock className="w-3 h-3" />
-                          {meal.ingredients.length} ingredients
+                          {meal.ingredients.length} ingredients / {effectiveServings} servings
                         </span>
                       </div>
-                      <Link
-                        to="/planner"
+                      <button
+                        type="button"
+                        onClick={() => setDetailMeal(meal)}
                         className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim inline-flex items-center gap-1 group/btn"
                       >
                         Recipe Details
                         <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover/btn:translate-x-1" />
-                      </Link>
+                      </button>
                     </div>
                   </article>
                 ))}
               </div>
             ) : (
-              <div className="rounded-[2rem] border border-dashed border-outline-variant p-10 text-center text-outline dark:text-stone-500">
+              <div className="rounded-[2rem] border border-dashed border-outline-variant p-10 text-center text-outline">
                 Add meals to your planner to see your weekly overview here.
               </div>
             )}
@@ -300,14 +355,14 @@ export default function Dashboard() {
 
         {/* Right column */}
         <div className="col-span-12 lg:col-span-4 space-y-6">
-          <div className="bg-surface-container-low dark:bg-stone-900 rounded-[2rem] p-6 lg:p-7">
+          <div className="bg-surface-container-low rounded-[2rem] p-6 lg:p-7">
             <div className="flex items-center justify-between mb-5">
               <h3 className="text-lg font-display font-bold text-primary-container dark:text-primary-fixed-dim">
                 Grocery List
               </h3>
               <Link
                 to="/grocery"
-                className="p-2 bg-surface-container-lowest dark:bg-stone-800 rounded-full text-primary-container dark:text-primary-fixed-dim shadow-sm transition-transform active:scale-95"
+                className="p-2 bg-surface-container-lowest rounded-full text-primary-container dark:text-primary-fixed-dim shadow-sm transition-transform active:scale-95"
                 aria-label="Open grocery list"
               >
                 <ArrowUpRight className="w-4 h-4" />
@@ -318,23 +373,23 @@ export default function Dashboard() {
                 {groceryPreview.map((item, i) => (
                   <li key={`${item.name}-${i}`} className="flex items-center gap-3">
                     <span className="w-4 h-4 rounded border border-outline-variant flex-shrink-0" />
-                    <span className="text-sm font-medium text-on-surface dark:text-stone-100 flex-grow truncate">
+                    <span className="text-sm font-medium text-on-surface flex-grow truncate">
                       {item.name}
                     </span>
                     <span className="text-xs text-outline whitespace-nowrap">
-                      {item.amount} {item.measure}
+                      {Number(item.scaledAmount.toFixed(2)).toString()} {item.measure}
                     </span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-on-surface-variant dark:text-stone-400">
+              <p className="text-sm text-on-surface-variant">
                 No grocery items needed for this week.
               </p>
             )}
           </div>
 
-          <div className="bg-surface-container-low dark:bg-stone-900 rounded-[2rem] p-6 lg:p-7">
+          <div className="bg-surface-container-low rounded-[2rem] p-6 lg:p-7">
             <h3 className="text-lg font-display font-bold text-primary-container dark:text-primary-fixed-dim mb-5">
               Pantry Stock Alerts
             </h3>
@@ -343,7 +398,7 @@ export default function Dashboard() {
                 {pantryAlerts.map((item, i) => (
                   <div
                     key={item.id}
-                    className={`p-4 bg-surface-container-lowest dark:bg-stone-800 rounded-2xl flex items-start gap-3 border-l-4 shadow-sm ${
+                    className={`p-4 bg-surface-container-lowest rounded-2xl flex items-start gap-3 border-l-4 shadow-sm ${
                       i === 0 ? 'border-secondary' : 'border-tertiary-container'
                     }`}
                   >
@@ -353,10 +408,10 @@ export default function Dashboard() {
                       <Bell className="w-5 h-5 text-tertiary-container flex-shrink-0 mt-0.5" />
                     )}
                     <div className="min-w-0">
-                      <p className="text-sm font-bold text-on-surface dark:text-stone-100 leading-tight">
+                      <p className="text-sm font-bold text-on-surface leading-tight">
                         Low on {item.name}
                       </p>
-                      <p className="text-xs text-on-surface-variant dark:text-stone-400 mt-0.5">
+                      <p className="text-xs text-on-surface-variant mt-0.5">
                         Only {item.amount} {item.measure} remaining
                       </p>
                     </div>
@@ -364,7 +419,7 @@ export default function Dashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-on-surface-variant dark:text-stone-400">
+              <p className="text-sm text-on-surface-variant">
                 Pantry levels look healthy.
               </p>
             )}
@@ -398,7 +453,7 @@ export default function Dashboard() {
           <h2 className="text-xl md:text-2xl font-display font-bold text-primary-container dark:text-primary-fixed-dim">
             Recipe Library
           </h2>
-          <span className="text-sm text-on-surface-variant dark:text-stone-400">
+          <span className="text-sm text-on-surface-variant">
             {filteredMeals.length} {filteredMeals.length === 1 ? 'meal' : 'meals'}
           </span>
         </div>
@@ -410,7 +465,7 @@ export default function Dashboard() {
             placeholder="Search recipes, ingredients..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low dark:bg-stone-900 rounded-full focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface dark:text-stone-100 placeholder:text-outline"
+            className="w-full pl-12 pr-4 py-3.5 bg-surface-container-low rounded-full focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface placeholder:text-outline"
           />
         </div>
         <div className="flex items-center gap-2 overflow-x-auto pb-1 hide-scrollbar">
@@ -419,7 +474,7 @@ export default function Dashboard() {
             className={`px-4 py-2 rounded-full text-xs font-display font-bold uppercase tracking-wider whitespace-nowrap transition-colors ${
               selectedTag === null
                 ? 'bg-primary text-on-primary'
-                : 'bg-surface-container-low dark:bg-stone-900 text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-stone-800'
+                : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high'
             }`}
           >
             All
@@ -431,7 +486,7 @@ export default function Dashboard() {
               className={`px-4 py-2 rounded-full text-xs font-display font-bold whitespace-nowrap inline-flex items-center gap-1.5 transition-colors ${
                 selectedTag === tag
                   ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant'
-                  : 'bg-surface-container-low dark:bg-stone-900 text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-stone-800'
+                  : 'bg-surface-container-low text-on-surface-variant hover:bg-surface-container-high dark:hover:bg-surface-container-high'
               }`}
             >
               <TagIcon className="w-3 h-3" />
@@ -452,12 +507,12 @@ export default function Dashboard() {
         </div>
 
         {filteredMeals.length === 0 && (
-          <div className="text-center py-14 bg-surface-container-low dark:bg-stone-900 rounded-[2rem]">
+          <div className="text-center py-14 bg-surface-container-low rounded-[2rem]">
             <Utensils className="w-12 h-12 text-outline mx-auto mb-3" />
-            <h3 className="text-lg font-display font-bold text-on-surface dark:text-stone-100">
+            <h3 className="text-lg font-display font-bold text-on-surface">
               No meals found
             </h3>
-            <p className="text-on-surface-variant dark:text-stone-400 mt-1">
+            <p className="text-on-surface-variant mt-1">
               Try adjusting your search or add a new meal.
             </p>
           </div>
@@ -470,14 +525,18 @@ export default function Dashboard() {
           onClose={() => {
             setIsAddModalOpen(false);
             setEditingMeal(null);
+            setScrollAddMealToIngredients(false);
           }}
           onSave={() => {
             setIsAddModalOpen(false);
             setEditingMeal(null);
+            setScrollAddMealToIngredients(false);
             fetchMeals();
           }}
           editingMeal={editingMeal}
           ingredientNameSuggestions={ingredientNameSuggestions}
+          scrollToIngredientsOnOpen={scrollAddMealToIngredients}
+          onScrollToIngredientsConsumed={() => setScrollAddMealToIngredients(false)}
         />
       )}
 
@@ -487,11 +546,30 @@ export default function Dashboard() {
           onClose={() => setIsImportModalOpen(false)}
           onSave={(draftMeal) => {
             setIsImportModalOpen(false);
-            setEditingMeal(draftMeal);
+            const servingsOk =
+              draftMeal.servings != null &&
+              Number.isFinite(Number(draftMeal.servings)) &&
+              Number(draftMeal.servings) > 0;
+            setEditingMeal({
+              ...draftMeal,
+              servings: servingsOk ? draftMeal.servings : loadDefaultServings(),
+            });
             setIsAddModalOpen(true);
           }}
         />
       )}
+
+      <MealDetailsModal
+        isOpen={Boolean(detailMeal)}
+        meal={detailMeal}
+        onClose={() => setDetailMeal(null)}
+        onEdit={() => {
+          if (!detailMeal) return;
+          setDetailMeal(null);
+          setEditingMeal(detailMeal);
+          setIsAddModalOpen(true);
+        }}
+      />
     </div>
   );
 }
@@ -506,7 +584,7 @@ interface MetricProps {
 
 function MetricCard({ label, value, unit, barPct, barClass = 'bg-primary' }: MetricProps) {
   return (
-    <div className="bg-surface-container-lowest dark:bg-stone-900 p-5 lg:p-6 rounded-[2rem] border border-outline-variant/15 dark:border-stone-800 flex flex-col items-center text-center">
+    <div className="bg-surface-container-lowest p-5 lg:p-6 rounded-[2rem] border border-outline-variant/15 flex flex-col items-center text-center">
       <span className="text-[10px] font-display font-bold uppercase tracking-widest text-primary-container/70 dark:text-primary-fixed-dim/70 mb-2">
         {label}
       </span>
@@ -514,7 +592,7 @@ function MetricCard({ label, value, unit, barPct, barClass = 'bg-primary' }: Met
         {value}
       </span>
       {unit ? (
-        <span className="text-[10px] text-on-surface-variant dark:text-stone-400 mt-1">{unit}</span>
+        <span className="text-[10px] text-on-surface-variant mt-1">{unit}</span>
       ) : null}
       {typeof barPct === 'number' && (
         <div className="w-full h-1 bg-surface-container mt-3 rounded-full overflow-hidden">

@@ -1,8 +1,11 @@
 export type AiProviderId = 'gemini' | 'ollama' | 'mlx';
 
+export type AiProviderUiMode = 'per_request' | 'global_only';
+
 export interface AiSettings {
   provider: AiProviderId;
   model: string;
+  providerUiMode?: AiProviderUiMode;
 }
 
 const STORAGE_KEY = 'aiSettings';
@@ -31,9 +34,12 @@ export function loadAiSettings(): AiSettings {
     if (provider !== 'gemini' && provider !== 'ollama' && provider !== 'mlx') {
       return DEFAULT_SETTINGS;
     }
+    const providerUiMode =
+      parsed.providerUiMode === 'global_only' ? 'global_only' : 'per_request';
     return {
       provider,
       model: typeof parsed.model === 'string' ? parsed.model : defaultModelForProvider(provider),
+      providerUiMode,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -41,5 +47,27 @@ export function loadAiSettings(): AiSettings {
 }
 
 export function saveAiSettings(settings: AiSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  const prev = loadAiSettings();
+  const merged: AiSettings = {
+    provider: settings.provider,
+    model: settings.model,
+    providerUiMode:
+      settings.providerUiMode ?? prev.providerUiMode ?? 'per_request',
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+  window.dispatchEvent(new CustomEvent('arpa-ai-settings-updated'));
 }
+
+export function loadAiProviderUiMode(): AiProviderUiMode {
+  return loadAiSettings().providerUiMode === 'global_only' ? 'global_only' : 'per_request';
+}
+
+export function saveAiProviderUiMode(mode: AiProviderUiMode): void {
+  const cur = loadAiSettings();
+  saveAiSettings({ ...cur, providerUiMode: mode });
+}
+
+export function showAiProviderPickerInModals(): boolean {
+  return loadAiProviderUiMode() === 'per_request';
+}
+

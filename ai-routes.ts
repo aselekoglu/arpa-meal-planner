@@ -8,6 +8,7 @@ import { AiProviderError, AiTaskOptions } from './ai/types.js';
 type ImportedRecipe = {
   name?: string;
   tag?: string;
+  servings?: number;
   instructions?: string[];
   source_url?: string;
   image_url?: string;
@@ -26,6 +27,7 @@ type GeneratedMealPlan = {
   meals?: Array<{
     name: string;
     tag?: string;
+    servings?: number;
     ingredients?: Array<{
       name: string;
       amount: number;
@@ -123,6 +125,7 @@ export function registerAiRoutes(app: Express) {
       {
         "name": string,
         "tag": string,
+        "servings": number,
         "instructions": string[],
         "source_url": string,
         "image_url": string,
@@ -288,6 +291,7 @@ Ensure instructions are clear, sequential cooking steps.`;
       Each meal must have:
       - 'name': The name of the meal
       - 'tag': A short category tag (e.g., '${diet}', 'Dinner')
+      - 'servings': Number of servings for the recipe
       - 'ingredients': An array of ingredients required for the meal.
       For each ingredient, provide:
       - 'name': Ingredient name
@@ -303,6 +307,7 @@ Ensure instructions are clear, sequential cooking steps.`;
         "meals": [{
           "name": string,
           "tag": string,
+          "servings": number,
           "ingredients": [{ "name": string, "amount": number, "measure": string, "calories": number, "protein": number, "fat": number, "carbs": number }]
         }]
       }`;
@@ -313,7 +318,7 @@ Ensure instructions are clear, sequential cooking steps.`;
       }
 
       const insertMeal = db.prepare(
-        'INSERT INTO meals (family_id, name, tag, instructions, source_url, image_url) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO meals (family_id, name, tag, instructions, source_url, image_url, servings) VALUES (?, ?, ?, ?, ?, ?, ?)'
       );
       const insertIngredient = db.prepare(
         'INSERT INTO ingredients (meal_id, name, amount, measure, calories, protein, fat, carbs) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
@@ -331,7 +336,10 @@ Ensure instructions are clear, sequential cooking steps.`;
             meal.tag || '',
             instructionsStr,
             null,
-            null
+            null,
+            Number.isInteger(meal.servings) && (meal.servings as number) > 0
+              ? (meal.servings as number)
+              : 4
           );
           const mealId = mealResult.lastInsertRowid as number;
           for (const ing of meal.ingredients || []) {

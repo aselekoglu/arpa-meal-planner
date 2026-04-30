@@ -48,7 +48,7 @@ export default function AiProviderSelector({
           value={model}
           onChange={(e) => onModelChange(e.target.value)}
           placeholder="Use provider default"
-          className="w-full px-4 py-2.5 bg-surface-container-lowest dark:bg-stone-800 border border-outline-variant/30 dark:border-stone-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface dark:text-stone-100 placeholder:text-outline text-sm"
+          className="w-full px-4 py-2.5 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface placeholder:text-outline text-sm"
         />
       </div>
       {disableImageProviders && (
@@ -77,7 +77,7 @@ function ProviderButton({
       className={`px-3 py-2 rounded-xl border text-xs font-display font-bold transition-colors ${
         active
           ? 'bg-primary-container/10 border-primary-container text-primary-container dark:bg-primary-fixed-dim/15 dark:border-primary-fixed-dim dark:text-primary-fixed-dim'
-          : 'bg-surface-container-lowest dark:bg-stone-900 border-outline-variant/30 dark:border-stone-700 text-on-surface-variant dark:text-stone-400 hover:border-primary-container/40'
+          : 'bg-surface-container-lowest border-outline-variant/30 text-on-surface-variant hover:border-primary-container/40'
       } disabled:opacity-40 disabled:cursor-not-allowed`}
     >
       {label}

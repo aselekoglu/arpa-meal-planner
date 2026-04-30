@@ -11,6 +11,8 @@ const MAX_TAG_LEN = 200;
 const MAX_INGREDIENTS = 200;
 const MAX_IMAGE_URL_LEN = 2_000_000;
 const MAX_SOURCE_URL_LEN = 2000;
+const MIN_SERVINGS = 1;
+const MAX_SERVINGS = 100;
 
 function parseFamilyId(req: express.Request): string {
   const v = req.headers['x-family-id'];
@@ -36,6 +38,7 @@ type SanitizedIngredient = {
 type SanitizedMeal = {
   name: string;
   tag: string;
+  servings: number;
   source_url: string | null;
   image_url: string | null;
   instructionsStr: string | null;
@@ -59,6 +62,13 @@ function validateMealBody(body: unknown): { ok: true; data: SanitizedMeal } | { 
   }
 
   const tag = typeof b.tag === 'string' ? b.tag.trim().slice(0, MAX_TAG_LEN) : '';
+  const servingsRaw = b.servings === undefined ? 4 : Number(b.servings);
+  if (!Number.isInteger(servingsRaw) || servingsRaw < MIN_SERVINGS || servingsRaw > MAX_SERVINGS) {
+    return {
+      ok: false,
+      error: `servings must be an integer between ${MIN_SERVINGS} and ${MAX_SERVINGS}`,
+    };
+  }
 
   let source_url: string | null = null;
   if (b.source_url != null) {
@@ -133,6 +143,7 @@ function validateMealBody(body: unknown): { ok: true; data: SanitizedMeal } | { 
     data: {
       name,
       tag,
+      servings: servingsRaw,
       source_url,
       image_url,
       instructionsStr,
@@ -207,17 +218,25 @@ async function startServer() {
         .status(400)
         .json({ error: 'error' in parsed ? parsed.error : 'Invalid meal payload' });
     }
-    const { name, tag, source_url, image_url, instructionsStr, ingredients } = parsed.data;
+    const { name, tag, servings, source_url, image_url, instructionsStr, ingredients } = parsed.data;
 
     const insertMeal = db.prepare(
-      'INSERT INTO meals (family_id, name, tag, instructions, source_url, image_url) VALUES (?, ?, ?, ?, ?, ?)'
+      'INSERT INTO meals (family_id, name, tag, instructions, source_url, image_url, servings) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
     const insertIngredient = db.prepare(
       'INSERT INTO ingredients (meal_id, name, amount, measure, calories, protein, fat, carbs) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
     );
 
     const createMeal = db.transaction(() => {
-      const result = insertMeal.run(familyId, name, tag, instructionsStr, source_url, image_url);
+      const result = insertMeal.run(
+        familyId,
+        name,
+        tag,
+        instructionsStr,
+        source_url,
+        image_url,
+        servings
+      );
       const mealId = result.lastInsertRowid;
       for (const ing of ingredients) {
         insertIngredient.run(
@@ -255,10 +274,10 @@ async function startServer() {
         .status(400)
         .json({ error: 'error' in parsed ? parsed.error : 'Invalid meal payload' });
     }
-    const { name, tag, source_url, image_url, instructionsStr, ingredients } = parsed.data;
+    const { name, tag, servings, source_url, image_url, instructionsStr, ingredients } = parsed.data;
 
     const updateMeal = db.prepare(
-      'UPDATE meals SET name = ?, tag = ?, instructions = ?, source_url = ?, image_url = ? WHERE id = ? AND family_id = ?'
+      'UPDATE meals SET name = ?, tag = ?, instructions = ?, source_url = ?, image_url = ?, servings = ? WHERE id = ? AND family_id = ?'
     );
     const deleteIngredients = db.prepare('DELETE FROM ingredients WHERE meal_id = ?');
     const insertIngredient = db.prepare(
@@ -266,7 +285,16 @@ async function startServer() {
     );
 
     const updateTransaction = db.transaction(() => {
-      const result = updateMeal.run(name, tag, instructionsStr, source_url, image_url, id, familyId);
+      const result = updateMeal.run(
+        name,
+        tag,
+        instructionsStr,
+        source_url,
+        image_url,
+        servings,
+        id,
+        familyId
+      );
       if (result.changes === 0) {
         throw new Error('NOT_FOUND');
       }
@@ -318,7 +346,7 @@ async function startServer() {
     const planner = db
       .prepare(
         `
-      SELECT p.id, p.date, p.meal_id, m.name as meal_name 
+      SELECT p.id, p.date, p.meal_id, p.servings_override, m.name as meal_name 
       FROM planner p 
       JOIN meals m ON p.meal_id = m.id
       WHERE p.family_id = ?
@@ -330,11 +358,25 @@ async function startServer() {
 
   app.post('/api/planner', (req, res) => {
     const familyId = parseFamilyId(req);
-    const { date, meal_id } = req.body || {};
+    const { date, meal_id, servings_override } = req.body || {};
     const dateStr = typeof date === 'string' ? date.trim() : '';
     const mealIdNum = Number(meal_id);
     if (!dateStr || !Number.isInteger(mealIdNum) || mealIdNum < 1) {
       return res.status(400).json({ error: 'date and meal_id are required' });
+    }
+    let servingsOverride: number | null = null;
+    if (servings_override !== undefined && servings_override !== null && servings_override !== '') {
+      const parsedServings = Number(servings_override);
+      if (
+        !Number.isInteger(parsedServings) ||
+        parsedServings < MIN_SERVINGS ||
+        parsedServings > MAX_SERVINGS
+      ) {
+        return res
+          .status(400)
+          .json({ error: `servings_override must be between ${MIN_SERVINGS} and ${MAX_SERVINGS}` });
+      }
+      servingsOverride = parsedServings;
     }
     const meal = db
       .prepare('SELECT id FROM meals WHERE id = ? AND family_id = ?')
@@ -344,8 +386,8 @@ async function startServer() {
     }
     try {
       const result = db
-        .prepare('INSERT INTO planner (family_id, date, meal_id) VALUES (?, ?, ?)')
-        .run(familyId, dateStr, mealIdNum);
+        .prepare('INSERT INTO planner (family_id, date, meal_id, servings_override) VALUES (?, ?, ?, ?)')
+        .run(familyId, dateStr, mealIdNum, servingsOverride);
       res.json({ id: result.lastInsertRowid, success: true });
     } catch {
       res.status(500).json({ error: 'Failed to add to planner' });
@@ -366,6 +408,42 @@ async function startServer() {
       res.json({ success: true });
     } catch {
       res.status(500).json({ error: 'Failed to remove from planner' });
+    }
+  });
+
+  app.patch('/api/planner/:id/servings', (req, res) => {
+    const familyId = parseFamilyId(req);
+    const id = parseIdParam(req.params.id);
+    if (id === null) {
+      return res.status(400).json({ error: 'Invalid id' });
+    }
+
+    const { servings_override } = req.body || {};
+    let servingsOverride: number | null = null;
+    if (servings_override !== undefined && servings_override !== null && servings_override !== '') {
+      const parsedServings = Number(servings_override);
+      if (
+        !Number.isInteger(parsedServings) ||
+        parsedServings < MIN_SERVINGS ||
+        parsedServings > MAX_SERVINGS
+      ) {
+        return res
+          .status(400)
+          .json({ error: `servings_override must be between ${MIN_SERVINGS} and ${MAX_SERVINGS}` });
+      }
+      servingsOverride = parsedServings;
+    }
+
+    try {
+      const result = db
+        .prepare('UPDATE planner SET servings_override = ? WHERE id = ? AND family_id = ?')
+        .run(servingsOverride, id, familyId);
+      if (result.changes === 0) {
+        return res.status(404).json({ error: 'Planner entry not found' });
+      }
+      res.json({ success: true });
+    } catch {
+      res.status(500).json({ error: 'Failed to update servings override' });
     }
   });
 

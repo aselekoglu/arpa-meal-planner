@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   X,
   ExternalLink,
@@ -14,6 +14,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Meal } from '../types';
+import {
+  getMealBaseServings,
+  getScaledIngredients,
+  getScaledMealNutritionTotals,
+  resolveEffectiveServings,
+} from '../lib/meal-scaling';
 
 interface MealDetailsModalProps {
   isOpen: boolean;
@@ -24,18 +30,30 @@ interface MealDetailsModalProps {
 
 export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: MealDetailsModalProps) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [displayServings, setDisplayServings] = useState(4);
+
+  const baseServings = meal ? getMealBaseServings(meal) : 4;
+
+  useEffect(() => {
+    if (!meal) return;
+    setDisplayServings(baseServings);
+    setCurrentStep(0);
+  }, [meal, baseServings]);
 
   if (!isOpen || !meal) return null;
 
-  const totalCalories = meal.ingredients.reduce((sum, ing) => sum + (ing.calories || 0), 0);
-  const totalProtein = meal.ingredients.reduce((sum, ing) => sum + (ing.protein || 0), 0);
-  const totalFat = meal.ingredients.reduce((sum, ing) => sum + (ing.fat || 0), 0);
-  const totalCarbs = meal.ingredients.reduce((sum, ing) => sum + (ing.carbs || 0), 0);
+  const effectiveServings = resolveEffectiveServings(meal, displayServings);
+  const scaledIngredients = getScaledIngredients(meal, effectiveServings);
+  const totals = getScaledMealNutritionTotals(meal, effectiveServings);
+  const totalCalories = totals.calories;
+  const totalProtein = totals.protein;
+  const totalFat = totals.fat;
+  const totalCarbs = totals.carbs;
 
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-surface dark:bg-stone-900 rounded-[2rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] border border-outline-variant/15 dark:border-stone-800">
-        <div className="relative h-72 bg-surface-container-high dark:bg-stone-800 flex-shrink-0">
+      <div className="bg-surface rounded-[2rem] shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col max-h-[92vh] border border-outline-variant/15">
+        <div className="relative h-72 bg-surface-container-high flex-shrink-0">
           {meal.image_url ? (
             <img
               src={meal.image_url}
@@ -53,7 +71,7 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
 
           <button
             onClick={onClose}
-            className="absolute top-5 right-5 p-2.5 bg-surface/90 dark:bg-stone-900/90 backdrop-blur-sm rounded-full text-on-surface dark:text-stone-200 hover:bg-surface shadow-sm transition-colors"
+            className="absolute top-5 right-5 p-2.5 bg-surface/90 dark:bg-surface/90 backdrop-blur-sm rounded-full text-on-surface hover:bg-surface shadow-sm transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -80,7 +98,30 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                   {meal.ingredients.length} ingredients
                 </span>
                 <span className="flex items-center gap-2">
-                  <UsersIcon className="w-4 h-4 text-primary-container" />4 servings
+                  <UsersIcon className="w-4 h-4 text-primary-container" />
+                  <span className="inline-flex items-center gap-1 rounded-full border border-outline-variant/40 bg-surface-container-lowest px-1 py-0.5">
+                    <button
+                      onClick={() => setDisplayServings((prev) => Math.max(1, prev - 1))}
+                      className="w-6 h-6 rounded-full bg-surface-container-low dark:bg-surface-container-highest text-on-surface text-sm font-bold hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors"
+                      aria-label="Decrease servings"
+                    >
+                      -
+                    </button>
+                    <span className="min-w-8 text-center text-xs font-display font-bold text-on-surface">
+                      {effectiveServings}
+                    </span>
+                    <button
+                      onClick={() => setDisplayServings((prev) => Math.min(100, prev + 1))}
+                      className="w-6 h-6 rounded-full bg-surface-container-low dark:bg-surface-container-highest text-on-surface text-sm font-bold hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors"
+                      aria-label="Increase servings"
+                    >
+                      +
+                    </button>
+                  </span>
+                  servings
+                  {effectiveServings !== baseServings ? (
+                    <span className="text-xs text-outline">(base {baseServings})</span>
+                  ) : null}
                 </span>
                 {totalCalories > 0 && (
                   <span className="flex items-center gap-2">
@@ -89,31 +130,37 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                   </span>
                 )}
               </div>
-              {meal.source_url && (
-                <a
-                  href={meal.source_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-3 inline-flex items-center gap-1.5 text-primary-container dark:text-primary-fixed-dim hover:underline font-display font-semibold text-sm"
-                >
-                  <ExternalLink className="w-4 h-4" />
-                  View Original Recipe
-                </a>
-              )}
-              <button
-                onClick={() => {
-                  onClose();
-                  onEdit();
-                }}
-                className="mt-3 inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-container/10 text-primary-container dark:bg-primary-fixed-dim/10 dark:text-primary-fixed-dim hover:opacity-90 transition-opacity font-display font-semibold text-sm"
+              <div
+                className={`mt-4 flex flex-wrap items-center gap-3 ${
+                  meal.source_url ? 'justify-between' : 'justify-start'
+                }`}
               >
-                <Edit2 className="w-4 h-4" />
-                Edit Meal
-              </button>
+                <button
+                  onClick={() => {
+                    onClose();
+                    onEdit();
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary-container/10 text-primary-container dark:bg-primary-fixed-dim/10 dark:text-primary-fixed-dim hover:opacity-90 transition-opacity font-display font-semibold text-sm"
+                >
+                  <Edit2 className="w-4 h-4" />
+                  Edit Meal
+                </button>
+                {meal.source_url ? (
+                  <a
+                    href={meal.source_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-primary-container dark:text-primary-fixed-dim hover:underline font-display font-semibold text-sm"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    View Original Recipe
+                  </a>
+                ) : null}
+              </div>
             </div>
 
             {(totalCalories > 0 || totalProtein > 0) && (
-              <div className="grid grid-cols-4 gap-2 bg-surface-container-low dark:bg-stone-800/60 p-3 rounded-2xl text-center">
+              <div className="grid grid-cols-4 gap-2 bg-surface-container-low dark:bg-surface-container-high/60 p-3 rounded-2xl text-center">
                 <NutrientStat label="Cal" value={Math.round(totalCalories)} />
                 <NutrientStat label="Pro" value={`${totalProtein.toFixed(0)}g`} />
                 <NutrientStat label="Fat" value={`${totalFat.toFixed(0)}g`} />
@@ -128,14 +175,14 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                 <ChefHat className="w-5 h-5" />
                 Ingredients
               </h3>
-              <ul className="space-y-3 bg-surface-container-low dark:bg-stone-800/40 rounded-2xl p-4">
-                {meal.ingredients.map((ing, i) => (
+              <ul className="space-y-3 bg-surface-container-low/95 rounded-2xl p-4">
+                {scaledIngredients.map((ing, i) => (
                   <li key={i} className="flex justify-between items-start text-sm gap-3">
-                    <span className="text-on-surface dark:text-stone-100 font-medium">
+                    <span className="text-on-surface font-medium">
                       {ing.name}
                     </span>
                     <span className="text-outline whitespace-nowrap text-right font-display font-semibold">
-                      {ing.amount} {ing.measure}
+                      {Number(ing.scaledAmount.toFixed(2)).toString()} {ing.measure}
                     </span>
                   </li>
                 ))}
@@ -148,7 +195,7 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                 Instructions
               </h3>
               {meal.instructions && meal.instructions.length > 0 ? (
-                <div className="relative bg-surface-container-lowest dark:bg-stone-800/50 rounded-[2rem] p-6 overflow-hidden min-h-[280px] flex flex-col border border-outline-variant/15 dark:border-stone-800">
+                <div className="relative bg-surface-container-lowest/50 rounded-[2rem] p-6 overflow-hidden min-h-[280px] flex flex-col border border-outline-variant/15">
                   <div className="flex justify-between items-center mb-6">
                     <span className="text-xs font-display font-bold text-primary-container dark:text-primary-fixed-dim uppercase tracking-widest">
                       Step {currentStep + 1} of {meal.instructions.length}
@@ -180,7 +227,7 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                         <span className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-fixed text-primary font-display font-extrabold flex items-center justify-center">
                           {currentStep + 1}
                         </span>
-                        <p className="text-on-surface dark:text-stone-100 text-base lg:text-lg leading-relaxed whitespace-pre-wrap">
+                        <p className="text-on-surface text-base lg:text-lg leading-relaxed whitespace-pre-wrap">
                           {meal.instructions[currentStep]}
                         </p>
                       </motion.div>
@@ -207,7 +254,7 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                   </div>
                 </div>
               ) : (
-                <div className="bg-surface-container-low dark:bg-stone-800/50 border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center text-on-surface-variant">
+                <div className="bg-surface-container-low dark:bg-surface-container-high/50 border border-dashed border-outline-variant/40 rounded-2xl p-6 text-center text-on-surface-variant">
                   <p>No instructions available for this meal.</p>
                   <p className="text-xs mt-1">Edit the meal to add step-by-step directions.</p>
                 </div>
@@ -226,7 +273,7 @@ function NutrientStat({ label, value }: { label: string; value: string | number 
       <div className="text-[10px] font-display font-bold uppercase tracking-widest text-outline">
         {label}
       </div>
-      <div className="text-sm font-display font-bold text-on-surface dark:text-stone-100 mt-0.5">
+      <div className="text-sm font-display font-bold text-on-surface mt-0.5">
         {value}
       </div>
     </div>

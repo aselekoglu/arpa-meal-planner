@@ -20,7 +20,8 @@ db.exec(`
     tag TEXT,
     image_url TEXT,
     instructions TEXT,
-    source_url TEXT
+    source_url TEXT,
+    servings INTEGER NOT NULL DEFAULT 4
   );
 
   CREATE TABLE IF NOT EXISTS ingredients (
@@ -41,6 +42,7 @@ db.exec(`
     family_id TEXT DEFAULT 'default',
     date TEXT NOT NULL,
     meal_id INTEGER NOT NULL,
+    servings_override INTEGER,
     FOREIGN KEY (meal_id) REFERENCES meals (id) ON DELETE CASCADE
   );
 
@@ -74,6 +76,13 @@ try {
 try {
   db.exec('ALTER TABLE meals ADD COLUMN instructions TEXT;');
   db.exec('ALTER TABLE meals ADD COLUMN source_url TEXT;');
+} catch (e) {
+  // Columns likely already exist
+}
+
+try {
+  db.exec('ALTER TABLE meals ADD COLUMN servings INTEGER NOT NULL DEFAULT 4;');
+  db.exec('ALTER TABLE planner ADD COLUMN servings_override INTEGER;');
 } catch (e) {
   // Columns likely already exist
 }
@@ -266,14 +275,16 @@ if (count.count === 0) {
     },
   ];
 
-  const insertMeal = db.prepare('INSERT INTO meals (name, tag, instructions, source_url) VALUES (?, ?, ?, ?)');
+  const insertMeal = db.prepare(
+    'INSERT INTO meals (name, tag, instructions, source_url, servings) VALUES (?, ?, ?, ?, ?)'
+  );
   const insertIngredient = db.prepare(
     'INSERT INTO ingredients (meal_id, name, amount, measure, calories, protein, fat, carbs) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
   );
 
   const insertMany = db.transaction((meals) => {
     for (const meal of meals) {
-      const result = insertMeal.run(meal.name, meal.tag, null, null);
+      const result = insertMeal.run(meal.name, meal.tag, null, null, 4);
       const mealId = result.lastInsertRowid;
       for (const ing of meal.ingredients) {
         insertIngredient.run(mealId, ing.name, ing.amount, ing.measure, ing.calories || 0, ing.protein || 0, ing.fat || 0, ing.carbs || 0);

@@ -3,7 +3,13 @@ import { MessageSquare, X, Send, Bot, User, Loader2, Sparkles } from 'lucide-rea
 import Markdown from 'react-markdown';
 import { apiFetch } from '../lib/api';
 import AiProviderSelector from './AiProviderSelector';
-import { AiProviderId, defaultModelForProvider, loadAiSettings, saveAiSettings } from '../lib/ai-settings';
+import {
+  AiProviderId,
+  defaultModelForProvider,
+  loadAiSettings,
+  saveAiSettings,
+  showAiProviderPickerInModals,
+} from '../lib/ai-settings';
 
 interface Message {
   role: 'user' | 'model';
@@ -31,6 +37,24 @@ export default function Chatbot() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isOpen]);
+
+  useEffect(() => {
+    const sync = () => {
+      const s = loadAiSettings();
+      setProvider(s.provider);
+      setModel(s.model);
+    };
+    sync();
+    window.addEventListener('arpa-ai-settings-updated', sync);
+    return () => window.removeEventListener('arpa-ai-settings-updated', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const s = loadAiSettings();
+    setProvider(s.provider);
+    setModel(s.model);
+  }, [isOpen]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
@@ -77,12 +101,12 @@ export default function Chatbot() {
     };
     setProvider(nextSettings.provider);
     setModel(nextSettings.model);
-    saveAiSettings(nextSettings);
+    if (showAiProviderPickerInModals()) saveAiSettings(nextSettings);
   };
 
   const handleModelChange = (next: string) => {
     setModel(next);
-    saveAiSettings({ provider, model: next });
+    if (showAiProviderPickerInModals()) saveAiSettings({ provider, model: next });
   };
 
   return (
@@ -98,7 +122,7 @@ export default function Chatbot() {
       </button>
 
       <div
-        className={`fixed bottom-24 lg:bottom-8 right-4 lg:right-10 w-[calc(100%-2rem)] max-w-sm bg-surface dark:bg-stone-900 rounded-[2rem] shadow-2xl border border-outline-variant/20 dark:border-stone-800 flex flex-col overflow-hidden transition-all duration-300 z-50 origin-bottom-right ${
+        className={`fixed bottom-24 lg:bottom-8 right-4 lg:right-10 w-[calc(100%-2rem)] max-w-sm bg-surface rounded-[2rem] shadow-2xl border border-outline-variant/20 flex flex-col overflow-hidden transition-all duration-300 z-50 origin-bottom-right ${
           isOpen ? 'scale-100 opacity-100 h-[520px]' : 'scale-0 opacity-0 h-0'
         }`}
       >
@@ -117,7 +141,7 @@ export default function Chatbot() {
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-surface-container-low dark:bg-stone-950 thin-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-surface-container-low thin-scrollbar">
           {messages.map((msg, i) => (
             <div
               key={i}
@@ -127,7 +151,7 @@ export default function Chatbot() {
                 className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                   msg.role === 'user'
                     ? 'bg-primary-container/15 text-primary-container dark:bg-primary-fixed-dim/15 dark:text-primary-fixed-dim'
-                    : 'bg-surface-container-high text-on-surface dark:bg-stone-800 dark:text-stone-200'
+                    : 'bg-surface-container-high text-on-surface'
                 }`}
               >
                 {msg.role === 'user' ? (
@@ -140,10 +164,10 @@ export default function Chatbot() {
                 className={`px-4 py-2.5 rounded-2xl max-w-[78%] text-sm ${
                   msg.role === 'user'
                     ? 'bg-primary-container text-on-primary rounded-tr-sm'
-                    : 'bg-surface-container-lowest dark:bg-stone-900 border border-outline-variant/20 dark:border-stone-800 text-on-surface dark:text-stone-100 rounded-tl-sm'
+                    : 'bg-surface-container-lowest border border-outline-variant/20 text-on-surface rounded-tl-sm'
                 }`}
               >
-                <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-surface-container-high dark:prose-invert dark:prose-pre:bg-stone-800/60 dark:prose-pre:text-stone-100">
+                <div className="prose prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-surface-container-high dark:prose-invert dark:prose-pre:bg-surface-container-high/60 dark:prose-pre:text-on-surface">
                   <Markdown>{msg.text}</Markdown>
                 </div>
               </div>
@@ -151,10 +175,10 @@ export default function Chatbot() {
           ))}
           {isLoading && (
             <div className="flex gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-surface-container-high text-on-surface dark:bg-stone-800 dark:text-stone-200 flex items-center justify-center flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-surface-container-high text-on-surface flex items-center justify-center flex-shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="px-4 py-3 rounded-2xl bg-surface-container-lowest dark:bg-stone-900 border border-outline-variant/20 dark:border-stone-800 rounded-tl-sm flex items-center gap-2">
+              <div className="px-4 py-3 rounded-2xl bg-surface-container-lowest border border-outline-variant/20 rounded-tl-sm flex items-center gap-2">
                 <Loader2 className="w-4 h-4 animate-spin text-outline" />
                 <span className="text-sm text-on-surface-variant">Thinking…</span>
               </div>
@@ -163,22 +187,29 @@ export default function Chatbot() {
           <div ref={messagesEndRef} />
         </div>
 
-        <div className="p-3 bg-surface dark:bg-stone-900 border-t border-outline-variant/20 dark:border-stone-800">
-          <div className="mb-3">
-            <AiProviderSelector
-              provider={provider}
-              model={model}
-              onProviderChange={handleProviderChange}
-              onModelChange={handleModelChange}
-            />
-          </div>
+        <div className="p-3 bg-surface border-t border-outline-variant/20">
+          {showAiProviderPickerInModals() ? (
+            <div className="mb-3">
+              <AiProviderSelector
+                provider={provider}
+                model={model}
+                onProviderChange={handleProviderChange}
+                onModelChange={handleModelChange}
+              />
+            </div>
+          ) : (
+            <p className="mb-3 text-[11px] text-outline">
+              AI provider from Preferences · {provider}
+              {model.trim() ? ` · ${model}` : ''}
+            </p>
+          )}
           <div className="flex gap-2 relative">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask about recipes, ingredients..."
-              className="w-full bg-surface-container-low dark:bg-stone-800 border border-transparent focus:bg-surface-container-lowest dark:focus:bg-stone-900 focus:border-primary/30 focus:ring-2 focus:ring-primary/20 rounded-2xl px-4 py-2.5 pr-12 resize-none h-11 text-sm transition-all text-on-surface dark:text-stone-100 placeholder:text-outline"
+              className="w-full bg-surface-container-low border border-transparent focus:bg-surface-container-lowest dark:focus:bg-surface-container-lowest focus:border-primary/30 focus:ring-2 focus:ring-primary/20 rounded-2xl px-4 py-2.5 pr-12 resize-none h-11 text-sm transition-all text-on-surface placeholder:text-outline"
               rows={1}
             />
             <button

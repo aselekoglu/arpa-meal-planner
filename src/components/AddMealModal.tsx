@@ -16,6 +16,9 @@ import { Meal, Ingredient } from '../types';
 import { apiFetch } from '../lib/api';
 import { APPROVED_MEASURE_LABELS } from '../lib/units';
 import { loadAiSettings } from '../lib/ai-settings';
+import { loadDefaultServings } from '../lib/preferences';
+import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
+import { applyNutritionEstimatesToIngredients } from '../lib/ai-job-apply';
 
 interface AddMealModalProps {
   isOpen: boolean;
@@ -23,6 +26,9 @@ interface AddMealModalProps {
   onSave: () => void;
   editingMeal?: Meal | Partial<Meal> | null;
   ingredientNameSuggestions?: string[];
+  /** When true once after open, scroll the ingredients block into view (AI job restore). */
+  scrollToIngredientsOnOpen?: boolean;
+  onScrollToIngredientsConsumed?: () => void;
 }
 
 export default function AddMealModal({
@@ -31,9 +37,13 @@ export default function AddMealModal({
   onSave,
   editingMeal,
   ingredientNameSuggestions = [],
+  scrollToIngredientsOnOpen = false,
+  onScrollToIngredientsConsumed,
 }: AddMealModalProps) {
+  const { runWithAiJob } = useAiJobQueue();
   const [name, setName] = useState('');
   const [tag, setTag] = useState('');
+  const [servings, setServings] = useState(4);
   const [instructions, setInstructions] = useState<string[]>([]);
   const [sourceUrl, setSourceUrl] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -49,12 +59,25 @@ export default function AddMealModal({
   const [instructionsInfo, setInstructionsInfo] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { provider, model } = loadAiSettings();
+  const ingredientsSectionRef = useRef<HTMLDivElement>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (editingMeal) {
       setName(editingMeal.name || '');
       setTag(editingMeal.tag || '');
+      setServings(
+        Number.isInteger(editingMeal.servings) && (editingMeal.servings as number) > 0
+          ? (editingMeal.servings as number)
+          : 4
+      );
       setInstructions(editingMeal.instructions || []);
       setSourceUrl(editingMeal.source_url || '');
       setImageUrl(editingMeal.image_url || '');
@@ -66,6 +89,7 @@ export default function AddMealModal({
     } else {
       setName('');
       setTag('');
+      setServings(loadDefaultServings());
       setInstructions([]);
       setSourceUrl('');
       setImageUrl('');
@@ -74,6 +98,12 @@ export default function AddMealModal({
       ]);
     }
   }, [editingMeal, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !scrollToIngredientsOnOpen || !ingredientsSectionRef.current) return;
+    ingredientsSectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    onScrollToIngredientsConsumed?.();
+  }, [isOpen, scrollToIngredientsOnOpen, editingMeal, onScrollToIngredientsConsumed]);
 
   useEffect(() => {
     if (!isOpen) {
@@ -174,50 +204,75 @@ export default function AddMealModal({
     if (!canEstimateNutrition) return;
 
     setIsEstimatingNutrition(true);
+    const { provider, model } = loadAiSettings();
+    const mealLabel = (name.trim() || 'Untitled meal').slice(0, 80);
+    const ingredientSnapshot = ingredients.map((i) => ({ ...i }));
+    const nameSnap = name.trim();
+    const tagSnap = tag.trim();
+    const servingsSnap = servings;
+    const instructionsSnap = [...instructions];
+    const sourceUrlSnap = sourceUrl.trim();
+    const imageUrlSnap = imageUrl.trim();
+    const mealId = typeof editingMeal?.id === 'number' ? editingMeal.id : null;
+
     try {
-      const res = await apiFetch('/api/ai/estimate-nutrition', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mealName: name.trim() || 'Untitled meal',
-          ingredients: validIngredients,
-          provider,
-          model: model.trim() || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error((data as { error?: string }).error || 'Failed to estimate nutrition');
-      }
+      await runWithAiJob(
+        {
+          kind: 'estimate-nutrition',
+          title: 'Estimate nutrition',
+          relatedLabel: mealLabel,
+          providerId: provider,
+          modelLabel: aiJobModelLabel(provider, model),
+          buildRestore: (result: { mealId: number | null; partial: Partial<Meal> }) => ({
+            path: '/',
+            state: {
+              addMealRestore: {
+                mealId: result.mealId,
+                partial: result.partial,
+                scrollToIngredients: true,
+              },
+            },
+          }),
+        },
+        async () => {
+          const res = await apiFetch('/api/ai/estimate-nutrition', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mealName: name.trim() || 'Untitled meal',
+              ingredients: validIngredients,
+              provider,
+              model: model.trim() || undefined,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error((data as { error?: string }).error || 'Failed to estimate nutrition');
+          }
 
-      const estimated = Array.isArray((data as { ingredients?: unknown[] }).ingredients)
-        ? ((data as { ingredients: Array<Record<string, unknown>> }).ingredients ?? [])
-        : [];
+          const estimated = Array.isArray((data as { ingredients?: unknown[] }).ingredients)
+            ? ((data as { ingredients: Array<Record<string, unknown>> }).ingredients ?? [])
+            : [];
 
-      setIngredients((prev) => {
-        const next = [...prev];
-        const used = new Set<number>();
-        for (let i = 0; i < next.length; i += 1) {
-          const baseName = (next[i].name || '').trim().toLowerCase();
-          const foundIdx = estimated.findIndex(
-            (item, idx) => !used.has(idx) && String(item.name || '').trim().toLowerCase() === baseName,
-          );
-          const fallbackIdx = foundIdx >= 0 ? foundIdx : estimated.findIndex((_, idx) => !used.has(idx));
-          if (fallbackIdx < 0) continue;
-          used.add(fallbackIdx);
-          const item = estimated[fallbackIdx];
-          next[i] = {
-            ...next[i],
-            calories: Math.max(0, Number(item.calories) || 0),
-            protein: Math.max(0, Number(item.protein) || 0),
-            fat: Math.max(0, Number(item.fat) || 0),
-            carbs: Math.max(0, Number(item.carbs) || 0),
+          const merged = applyNutritionEstimatesToIngredients(ingredientSnapshot, estimated);
+          const partial: Partial<Meal> = {
+            name: nameSnap || undefined,
+            tag: tagSnap || undefined,
+            servings: servingsSnap,
+            instructions: instructionsSnap,
+            source_url: sourceUrlSnap || null,
+            image_url: imageUrlSnap || null,
+            ingredients: merged as Meal['ingredients'],
           };
-        }
-        return next;
-      });
 
-      setNutritionInfo('Nutrition fields updated from AI estimates.');
+          if (mountedRef.current) {
+            setIngredients(merged);
+            setNutritionInfo('Nutrition fields updated from AI estimates.');
+          }
+
+          return { mealId, partial };
+        },
+      );
     } catch (error) {
       setNutritionError(error instanceof Error ? error.message : 'Failed to estimate nutrition');
     } finally {
@@ -236,37 +291,85 @@ export default function AddMealModal({
     }
 
     setIsFetchingInstructions(true);
-    try {
-      const res = await apiFetch('/api/ai/fetch-instructions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mealName: name.trim(),
-          sourceUrl: sourceUrl.trim() || undefined,
-          ingredients: validIngredients,
-          provider,
-          model: model.trim() || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error((data as { error?: string }).error || 'Failed to fetch instructions');
-      }
+    const { provider, model } = loadAiSettings();
+    const mealLabel = name.trim().slice(0, 80);
+    const ingredientSnapshot = ingredients.map((i) => ({ ...i }));
+    const nameSnap = name.trim();
+    const tagSnap = tag.trim();
+    const servingsSnap = servings;
+    const sourceUrlSnap = sourceUrl.trim();
+    const imageUrlSnap = imageUrl.trim();
+    const mealId = typeof editingMeal?.id === 'number' ? editingMeal.id : null;
 
-      const nextInstructions = Array.isArray((data as { instructions?: unknown[] }).instructions)
-        ? ((data as { instructions: unknown[] }).instructions
-            .map((step) => String(step).trim())
-            .filter(Boolean))
-        : [];
-      if (nextInstructions.length === 0) {
-        throw new Error('No instructions were returned.');
-      }
-      setInstructions(nextInstructions);
-      if (typeof (data as { sourceUrl?: unknown }).sourceUrl === 'string') {
-        const nextSourceUrl = (data as { sourceUrl: string }).sourceUrl.trim();
-        if (nextSourceUrl) setSourceUrl(nextSourceUrl);
-      }
-      setInstructionsInfo('Instructions fetched successfully.');
+    try {
+      await runWithAiJob(
+        {
+          kind: 'fetch-instructions',
+          title: 'Fetch instructions',
+          relatedLabel: mealLabel || 'Meal',
+          providerId: provider,
+          modelLabel: aiJobModelLabel(provider, model),
+          buildRestore: (result: { mealId: number | null; partial: Partial<Meal> }) => ({
+            path: '/',
+            state: {
+              addMealRestore: {
+                mealId: result.mealId,
+                partial: result.partial,
+                scrollToIngredients: true,
+              },
+            },
+          }),
+        },
+        async () => {
+          const res = await apiFetch('/api/ai/fetch-instructions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mealName: name.trim(),
+              sourceUrl: sourceUrl.trim() || undefined,
+              ingredients: validIngredients,
+              provider,
+              model: model.trim() || undefined,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error((data as { error?: string }).error || 'Failed to fetch instructions');
+          }
+
+          const nextInstructions = Array.isArray((data as { instructions?: unknown[] }).instructions)
+            ? ((data as { instructions: unknown[] }).instructions
+                .map((step) => String(step).trim())
+                .filter(Boolean))
+            : [];
+          if (nextInstructions.length === 0) {
+            throw new Error('No instructions were returned.');
+          }
+          let resolvedSource = sourceUrlSnap || null;
+          if (typeof (data as { sourceUrl?: unknown }).sourceUrl === 'string') {
+            const nextSourceUrl = (data as { sourceUrl: string }).sourceUrl.trim();
+            if (nextSourceUrl) resolvedSource = nextSourceUrl;
+          }
+
+          const partial: Partial<Meal> = {
+            name: nameSnap || undefined,
+            tag: tagSnap || undefined,
+            servings: servingsSnap,
+            ingredients: ingredientSnapshot as Meal['ingredients'],
+            image_url: imageUrlSnap || null,
+            source_url: resolvedSource,
+            instructions: nextInstructions,
+          };
+
+          if (mountedRef.current) {
+            setInstructions(nextInstructions);
+            if (resolvedSource) setSourceUrl(resolvedSource);
+            setInstructionsInfo('Instructions fetched successfully.');
+          }
+
+          return { mealId, partial };
+        },
+      );
     } catch (error) {
       setInstructionsError(error instanceof Error ? error.message : 'Failed to fetch instructions');
     } finally {
@@ -282,6 +385,7 @@ export default function AddMealModal({
     const mealData = {
       name,
       tag,
+      servings,
       instructions: instructions.filter((step) => step.trim() !== ''),
       source_url: sourceUrl,
       image_url: imageUrl,
@@ -313,15 +417,15 @@ export default function AddMealModal({
   };
 
   const inputClass =
-    'w-full px-4 py-3 bg-surface-container-lowest dark:bg-stone-800 border border-outline-variant/30 dark:border-stone-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface dark:text-stone-100 placeholder:text-outline';
+    'w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface placeholder:text-outline';
 
   const fieldLabel =
     'block text-[11px] font-display font-bold uppercase tracking-widest text-outline mb-1.5';
 
   return (
     <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-surface dark:bg-stone-900 rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] border border-outline-variant/15 dark:border-stone-800">
-        <div className="px-6 py-5 flex justify-between items-center sticky top-0 bg-surface dark:bg-stone-900 z-10 border-b border-outline-variant/15 dark:border-stone-800">
+      <div className="bg-surface rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] border border-outline-variant/15">
+        <div className="px-6 py-5 flex justify-between items-center sticky top-0 bg-surface z-10 border-b border-outline-variant/15">
           <div>
             <h2 className="text-xl font-display font-extrabold text-primary-container dark:text-primary-fixed-dim tracking-tight">
               {editingMeal && editingMeal.id ? 'Edit Recipe' : 'Add New Recipe'}
@@ -332,7 +436,7 @@ export default function AddMealModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full text-outline hover:bg-surface-container-high dark:hover:bg-stone-800 transition-colors"
+            className="p-2 rounded-full text-outline hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -364,6 +468,20 @@ export default function AddMealModal({
               </div>
             </div>
 
+            <div className="max-w-xs">
+              <label className={fieldLabel}>Default Servings *</label>
+              <input
+                type="number"
+                min="1"
+                max="100"
+                step="1"
+                required
+                value={servings}
+                onChange={(e) => setServings(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                className={inputClass}
+              />
+            </div>
+
             <div>
               <label className={fieldLabel}>Source URL</label>
               <input
@@ -379,7 +497,7 @@ export default function AddMealModal({
               <label className={fieldLabel}>Meal Image</label>
               <div className="space-y-3">
                 {imageUrl ? (
-                  <div className="relative aspect-video rounded-2xl overflow-hidden border border-outline-variant/30 dark:border-stone-700 bg-surface-container-low dark:bg-stone-800">
+                  <div className="relative aspect-video rounded-2xl overflow-hidden border border-outline-variant/30 bg-surface-container-low">
                     <img
                       src={imageUrl}
                       alt="Preview"
@@ -395,7 +513,7 @@ export default function AddMealModal({
                     </button>
                   </div>
                 ) : (
-                  <div className="aspect-video rounded-2xl border-2 border-dashed border-outline-variant/40 dark:border-stone-700 flex flex-col items-center justify-center bg-surface-container-low dark:bg-stone-800/50 text-outline">
+                  <div className="aspect-video rounded-2xl border-2 border-dashed border-outline-variant/40 flex flex-col items-center justify-center bg-surface-container-low dark:bg-surface-container-high/50 text-outline">
                     {isCameraOpen ? (
                       <div className="relative w-full h-full">
                         <video
@@ -432,7 +550,7 @@ export default function AddMealModal({
 
                 {!isCameraOpen && (
                   <div className="grid grid-cols-3 gap-2">
-                    <label className="flex flex-col items-center justify-center p-3 bg-surface-container-lowest dark:bg-stone-800 border border-outline-variant/30 dark:border-stone-700 rounded-2xl hover:bg-surface-container-low dark:hover:bg-stone-700 cursor-pointer transition-colors">
+                    <label className="flex flex-col items-center justify-center p-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl hover:bg-surface-container-low dark:hover:bg-surface-container-highest cursor-pointer transition-colors">
                       <Upload className="w-5 h-5 mb-1 text-primary-container dark:text-primary-fixed-dim" />
                       <span className="text-xs font-display font-semibold">Upload</span>
                       <input
@@ -445,13 +563,13 @@ export default function AddMealModal({
                     <button
                       type="button"
                       onClick={startCamera}
-                      className="flex flex-col items-center justify-center p-3 bg-surface-container-lowest dark:bg-stone-800 border border-outline-variant/30 dark:border-stone-700 rounded-2xl hover:bg-surface-container-low dark:hover:bg-stone-700 transition-colors"
+                      className="flex flex-col items-center justify-center p-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors"
                     >
                       <Camera className="w-5 h-5 mb-1 text-primary-container dark:text-primary-fixed-dim" />
                       <span className="text-xs font-display font-semibold">Camera</span>
                     </button>
                     <div className="relative group">
-                      <div className="flex flex-col items-center justify-center p-3 bg-surface-container-lowest dark:bg-stone-800 border border-outline-variant/30 dark:border-stone-700 rounded-2xl hover:bg-surface-container-low dark:hover:bg-stone-700 transition-colors">
+                      <div className="flex flex-col items-center justify-center p-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl hover:bg-surface-container-low dark:hover:bg-surface-container-highest transition-colors">
                         <LinkIcon className="w-5 h-5 mb-1 text-primary-container dark:text-primary-fixed-dim" />
                         <span className="text-xs font-display font-semibold">URL</span>
                       </div>
@@ -460,7 +578,7 @@ export default function AddMealModal({
                         placeholder="Paste image URL..."
                         value={imageUrl}
                         onChange={(e) => setImageUrl(e.target.value)}
-                        className="absolute inset-0 opacity-0 focus:opacity-100 w-full h-full px-3 py-2 border border-primary rounded-2xl bg-surface-container-lowest dark:bg-stone-800 text-xs transition-opacity"
+                        className="absolute inset-0 opacity-0 focus:opacity-100 w-full h-full px-3 py-2 border border-primary rounded-2xl bg-surface-container-lowest text-xs transition-opacity"
                       />
                     </div>
                   </div>
@@ -527,14 +645,14 @@ export default function AddMealModal({
                   </div>
                 ))}
                 {instructions.length === 0 && (
-                  <div className="text-sm text-on-surface-variant italic text-center py-5 bg-surface-container-low dark:bg-stone-800/50 rounded-2xl border border-dashed border-outline-variant/40">
+                  <div className="text-sm text-on-surface-variant italic text-center py-5 bg-surface-container-low dark:bg-surface-container-high/50 rounded-2xl border border-dashed border-outline-variant/40">
                     No instructions added yet. Click "Add Step" to begin.
                   </div>
                 )}
               </div>
             </div>
 
-            <div>
+            <div ref={ingredientsSectionRef}>
               <div className="flex justify-between items-center mb-3">
                 <label className={fieldLabel + ' mb-0'}>Ingredients</label>
                 <div className="flex items-center gap-3">
@@ -567,7 +685,7 @@ export default function AddMealModal({
                 {ingredients.map((ing, index) => (
                   <div
                     key={index}
-                    className="flex flex-col gap-3 p-4 bg-surface-container-low dark:bg-stone-800 border border-outline-variant/30 dark:border-stone-700 rounded-2xl"
+                    className="flex flex-col gap-3 p-4 bg-surface-container-low border border-outline-variant/30 rounded-2xl"
                   >
                     <div className="flex flex-wrap gap-2 items-start">
                       <input
@@ -646,11 +764,11 @@ export default function AddMealModal({
           </div>
         </form>
 
-        <div className="px-6 py-4 bg-surface-container-low dark:bg-stone-800/40 border-t border-outline-variant/15 dark:border-stone-800 flex justify-end gap-3 sticky bottom-0 z-10">
+        <div className="px-6 py-4 bg-surface-container-low/95 border-t border-outline-variant/15 flex justify-end gap-3 sticky bottom-0 z-10">
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 text-on-surface-variant dark:text-stone-300 font-display font-semibold text-sm rounded-full hover:bg-surface-container-high dark:hover:bg-stone-700 transition-colors"
+            className="px-5 py-2.5 text-on-surface-variant font-display font-semibold text-sm rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors"
           >
             Cancel
           </button>
@@ -685,7 +803,7 @@ function NutrientInput({ label, placeholder, value, onChange }: NutrientInputPro
         placeholder={placeholder}
         value={value || ''}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full px-3 py-2 text-sm bg-surface-container-lowest dark:bg-stone-900 border border-outline-variant/30 dark:border-stone-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface dark:text-stone-100"
+        className="w-full px-3 py-2 text-sm bg-surface-container-lowest border border-outline-variant/30 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface"
       />
       <div className="text-[10px] text-outline mt-0.5 ml-1 font-display font-semibold uppercase tracking-wider">
         {label}

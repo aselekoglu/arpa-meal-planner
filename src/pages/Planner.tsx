@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useReducer } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { format, addDays, startOfWeek } from 'date-fns';
 import {
   Plus,
@@ -13,8 +14,13 @@ import {
 import { Meal, PlannerItem } from '../types';
 import GeneratePlanModal from '../components/GeneratePlanModal';
 import { apiFetch } from '../lib/api';
+import { getMealBaseServings, resolveEffectiveServings } from '../lib/meal-scaling';
+import { isAiJobNavigationState, type AiJobNavigationState } from '../lib/ai-job-nav-state';
+import { loadWeekStartsOn } from '../lib/preferences';
 
 export default function Planner() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [plannerItems, setPlannerItems] = useState<PlannerItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -22,6 +28,13 @@ export default function Planner() {
   const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
   const [discoverySearch, setDiscoverySearch] = useState('');
   const [discoveryFilter, setDiscoveryFilter] = useState<string | null>(null);
+
+  const [, bumpPrefs] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    const onPrefs = () => bumpPrefs();
+    window.addEventListener('arpa-preferences-updated', onPrefs);
+    return () => window.removeEventListener('arpa-preferences-updated', onPrefs);
+  }, []);
 
   const fetchMeals = async () => {
     try {
@@ -48,7 +61,16 @@ export default function Planner() {
     fetchPlanner();
   }, []);
 
-  const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
+  useEffect(() => {
+    const raw = location.state as AiJobNavigationState | null | undefined;
+    if (!raw || !isAiJobNavigationState(raw) || !raw.plannerRefresh) return;
+    fetchMeals();
+    fetchPlanner();
+    navigate('.', { replace: true, state: {} });
+  }, [location.state, navigate]);
+
+  const weekStartsOn = loadWeekStartsOn();
+  const startDate = startOfWeek(selectedDate, { weekStartsOn });
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
 
   const tags = Array.from(new Set(meals.map((m) => m.tag).filter(Boolean)));
@@ -59,17 +81,44 @@ export default function Planner() {
     return matchesSearch && matchesFilter;
   });
 
-  const handleAddMeal = async (dateStr: string, mealId: number) => {
+  const handleAddMeal = async (dateStr: string, mealId: number, servingsOverride: number | null = null) => {
     try {
       await apiFetch('/api/planner', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: dateStr, meal_id: mealId }),
+        body: JSON.stringify({ date: dateStr, meal_id: mealId, servings_override: servingsOverride }),
       });
       fetchPlanner();
       setIsAdding(null);
     } catch (error) {
       console.error('Failed to add meal to planner', error);
+    }
+  };
+
+  const handleUpdateServingsOverride = async (plannerId: number, servingsOverride: number | null) => {
+    const previous = plannerItems;
+    setPlannerItems((prev) =>
+      prev.map((item) =>
+        item.id === plannerId ? { ...item, servings_override: servingsOverride } : item
+      )
+    );
+
+    try {
+      const res = await apiFetch(`/api/planner/${plannerId}/servings`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ servings_override: servingsOverride }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(
+          (body as { error?: string }).error || 'Failed to update servings override'
+        );
+      }
+    } catch (error) {
+      setPlannerItems(previous);
+      console.error('Failed to update servings override', error);
+      alert(error instanceof Error ? error.message : 'Failed to update servings override');
     }
   };
 
@@ -106,25 +155,25 @@ export default function Planner() {
           <h1 className="text-3xl md:text-4xl font-display font-extrabold tracking-tight text-primary-container dark:text-primary-fixed-dim">
             Weekly Planner
           </h1>
-          <p className="text-on-surface-variant dark:text-stone-400 mt-1 font-medium">
+          <p className="text-on-surface-variant mt-1 font-medium">
             Drag recipes from the discovery panel onto your week.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 bg-surface-container-low dark:bg-stone-900 rounded-full p-1.5">
+          <div className="flex items-center gap-2 bg-surface-container-low rounded-full p-1.5">
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, -7))}
-              className="p-2 rounded-full hover:bg-surface-container-lowest dark:hover:bg-stone-800 transition-colors active:scale-90"
+              className="p-2 rounded-full hover:bg-surface-container-lowest transition-colors active:scale-90"
               aria-label="Previous week"
             >
               <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
             </button>
-            <div className="px-3 text-sm font-display font-semibold text-on-surface dark:text-stone-100 whitespace-nowrap">
+            <div className="px-3 text-sm font-display font-semibold text-on-surface whitespace-nowrap">
               {format(startDate, 'MMM d')} – {format(addDays(startDate, 6), 'MMM d')}
             </div>
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, 7))}
-              className="p-2 rounded-full hover:bg-surface-container-lowest dark:hover:bg-stone-800 transition-colors active:scale-90"
+              className="p-2 rounded-full hover:bg-surface-container-lowest transition-colors active:scale-90"
               aria-label="Next week"
             >
               <ChevronRight className="w-4 h-4 text-on-surface-variant" />
@@ -132,7 +181,7 @@ export default function Planner() {
           </div>
           <button
             onClick={() => setSelectedDate(new Date())}
-            className="px-5 py-2.5 rounded-full bg-surface-container-highest dark:bg-stone-800 text-on-surface dark:text-stone-100 font-display font-semibold text-sm hover:bg-surface-dim dark:hover:bg-stone-700 transition-colors"
+            className="px-5 py-2.5 rounded-full bg-surface-container-highest text-on-surface font-display font-semibold text-sm hover:bg-surface-container-high transition-colors"
           >
             Today
           </button>
@@ -177,7 +226,7 @@ export default function Planner() {
                     className={`font-display text-xl font-extrabold ${
                       isToday
                         ? 'text-primary-container dark:text-primary-fixed-dim'
-                        : 'text-on-surface dark:text-stone-100'
+                        : 'text-on-surface'
                     }`}
                   >
                     {format(day, 'd')}
@@ -188,7 +237,7 @@ export default function Planner() {
                   dayMealsWithImg.map(({ planner, meal }) => (
                     <article
                       key={planner.id}
-                      className="aspect-[4/5] rounded-[1.5rem] overflow-hidden relative group/card cursor-pointer shadow-sm hover:shadow-md transition-all active:scale-[0.98] bg-surface-container dark:bg-stone-800"
+                      className="aspect-[4/5] rounded-[1.5rem] overflow-hidden relative group/card shadow-sm hover:shadow-md transition-all bg-surface-container"
                     >
                       {meal?.image_url ? (
                         <img
@@ -200,7 +249,7 @@ export default function Planner() {
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-primary-container/30 to-secondary-container/30" />
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3 flex flex-col justify-end">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/30 to-transparent p-3 flex flex-col justify-end pointer-events-none">
                         <h4 className="text-white font-display font-bold text-sm leading-tight line-clamp-2">
                           {planner.meal_name}
                         </h4>
@@ -211,13 +260,58 @@ export default function Planner() {
                             </span>
                           </div>
                         )}
+                        {meal ? (
+                          <div className="mt-1 inline-flex items-center gap-1 bg-white/20 backdrop-blur-sm rounded-full px-2 py-0.5 text-[10px] text-white/90 font-bold">
+                            <Clock className="w-3 h-3" />
+                            {resolveEffectiveServings(meal, planner.servings_override)} servings
+                          </div>
+                        ) : null}
                       </div>
+                      {meal ? (
+                        <>
+                          <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const current = resolveEffectiveServings(meal, planner.servings_override);
+                              if (current <= 1) return;
+                              const next = current - 1;
+                              const base = getMealBaseServings(meal);
+                              handleUpdateServingsOverride(planner.id, next === base ? null : next);
+                            }}
+                            className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/65 text-white text-xl font-bold flex items-center justify-center shadow-lg opacity-0 group-hover/card:opacity-100 hover:bg-black/80 transition-all pointer-events-auto"
+                            aria-label="Decrease servings"
+                          >
+                            -
+                          </button>
+                          <button
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                            }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const current = resolveEffectiveServings(meal, planner.servings_override);
+                              const next = Math.min(100, current + 1);
+                              const base = getMealBaseServings(meal);
+                              handleUpdateServingsOverride(planner.id, next === base ? null : next);
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-black/65 text-white text-xl font-bold flex items-center justify-center shadow-lg opacity-0 group-hover/card:opacity-100 hover:bg-black/80 transition-all pointer-events-auto"
+                            aria-label="Increase servings"
+                          >
+                            +
+                          </button>
+                        </>
+                      ) : null}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           handleRemoveMeal(planner.id);
                         }}
-                        className="absolute top-2 right-2 p-1.5 bg-white/85 hover:bg-white text-secondary rounded-full opacity-0 group-hover/card:opacity-100 transition-all"
+                        className="absolute top-2 right-2 z-20 p-1.5 bg-white/85 hover:bg-white text-secondary rounded-full opacity-0 group-hover/card:opacity-100 transition-all"
                         aria-label="Remove from planner"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -227,12 +321,12 @@ export default function Planner() {
                 ) : null}
 
                 {isAdding === dateStr ? (
-                  <div className="aspect-[4/5] rounded-[1.5rem] border-2 border-primary/40 bg-surface-container-low dark:bg-stone-900 flex items-center p-3">
+                  <div className="aspect-[4/5] rounded-[1.5rem] border-2 border-primary/40 bg-surface-container-low flex items-center p-3">
                     <select
-                      className="w-full h-full text-sm bg-transparent border border-outline-variant/40 dark:border-stone-700 rounded-2xl px-2 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface dark:text-stone-100"
+                      className="w-full h-full text-sm bg-transparent border border-outline-variant/40 rounded-2xl px-2 py-2 focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface"
                       onChange={(e) => {
                         if (e.target.value) {
-                          handleAddMeal(dateStr, parseInt(e.target.value));
+                          handleAddMeal(dateStr, parseInt(e.target.value, 10));
                         }
                       }}
                       onBlur={() => setIsAdding(null)}
@@ -241,7 +335,7 @@ export default function Planner() {
                       <option value="">Select a meal…</option>
                       {meals.map((meal) => (
                         <option key={meal.id} value={meal.id}>
-                          {meal.name}
+                          {meal.name} ({getMealBaseServings(meal)} servings)
                         </option>
                       ))}
                     </select>
@@ -249,7 +343,7 @@ export default function Planner() {
                 ) : (
                   <button
                     onClick={() => setIsAdding(dateStr)}
-                    className="aspect-[4/5] rounded-[1.5rem] border-2 border-dashed border-outline-variant/50 hover:border-primary/40 hover:bg-surface-container-low dark:hover:bg-stone-900/50 flex flex-col items-center justify-center gap-2 text-outline hover:text-primary-container transition-colors group/empty"
+                    className="aspect-[4/5] rounded-[1.5rem] border-2 border-dashed border-outline-variant/50 hover:border-primary/40 hover:bg-surface-container-low dark:hover:bg-surface-container-low/50 flex flex-col items-center justify-center gap-2 text-outline hover:text-primary-container transition-colors group/empty"
                   >
                     <Plus className="w-5 h-5" />
                     <span className="text-[10px] font-display font-bold uppercase tracking-wider">
@@ -263,7 +357,7 @@ export default function Planner() {
         </section>
 
         {/* Discovery panel */}
-        <aside className="w-full lg:w-80 flex-shrink-0 bg-surface-container-low dark:bg-stone-900 rounded-[2rem] p-6 flex flex-col gap-5 self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]">
+        <aside className="w-full lg:w-80 flex-shrink-0 bg-surface-container-low rounded-[2rem] p-6 flex flex-col gap-5 self-start lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)]">
           <div>
             <h3 className="font-display text-xl font-bold text-primary-container dark:text-primary-fixed-dim">
               Recipe Discovery
@@ -278,7 +372,7 @@ export default function Planner() {
               value={discoverySearch}
               onChange={(e) => setDiscoverySearch(e.target.value)}
               placeholder="Find inspiration…"
-              className="w-full pl-9 pr-3 py-2.5 bg-surface-container-lowest dark:bg-stone-800 border-none rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-primary/30 text-on-surface dark:text-stone-100 placeholder:text-outline"
+              className="w-full pl-9 pr-3 py-2.5 bg-surface-container-lowest border-none rounded-full text-xs focus:outline-none focus:ring-1 focus:ring-primary/30 text-on-surface placeholder:text-outline"
             />
           </div>
 
@@ -288,7 +382,7 @@ export default function Planner() {
               className={`px-3 py-1.5 rounded-full text-[10px] font-display font-bold transition-colors ${
                 discoveryFilter === null
                   ? 'bg-primary text-on-primary'
-                  : 'bg-surface-container-lowest dark:bg-stone-800 text-on-surface-variant hover:bg-surface-dim'
+                  : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-dim'
               }`}
             >
               All
@@ -300,7 +394,7 @@ export default function Planner() {
                 className={`px-3 py-1.5 rounded-full text-[10px] font-display font-bold transition-colors ${
                   discoveryFilter === tag
                     ? 'bg-tertiary-fixed text-on-tertiary-fixed-variant'
-                    : 'bg-surface-container-lowest dark:bg-stone-800 text-on-surface-variant hover:bg-surface-dim'
+                    : 'bg-surface-container-lowest text-on-surface-variant hover:bg-surface-dim'
                 }`}
               >
                 {tag}
@@ -315,9 +409,9 @@ export default function Planner() {
                   key={meal.id}
                   draggable
                   onDragStart={(e) => handleDragStart(e, meal.id)}
-                  className="group flex items-center gap-3 p-2 bg-surface-container-lowest dark:bg-stone-800 rounded-2xl hover:shadow-md transition-all cursor-grab active:cursor-grabbing"
+                  className="group flex items-center gap-3 p-2 bg-surface-container-lowest rounded-2xl hover:shadow-md transition-all cursor-grab active:cursor-grabbing"
                 >
-                  <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 bg-surface-container-high dark:bg-stone-700">
+                  <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 bg-surface-container-high dark:bg-surface-container-highest">
                     {meal.image_url ? (
                       <img
                         src={meal.image_url}
@@ -328,7 +422,7 @@ export default function Planner() {
                     ) : null}
                   </div>
                   <div className="flex flex-col min-w-0 flex-1">
-                    <h5 className="text-xs font-display font-bold text-on-surface dark:text-stone-100 truncate">
+                    <h5 className="text-xs font-display font-bold text-on-surface truncate">
                       {meal.name}
                     </h5>
                     <div className="flex flex-wrap items-center gap-1.5 mt-1">
@@ -339,7 +433,7 @@ export default function Planner() {
                       )}
                       <span className="text-outline text-[9px] font-medium flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {meal.ingredients.length}
+                        {meal.ingredients.length} / {getMealBaseServings(meal)} servings
                       </span>
                     </div>
                   </div>

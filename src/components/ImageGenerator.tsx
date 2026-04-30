@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Meal } from '../types';
 import { apiFetch } from '../lib/api';
 import AiProviderSelector from './AiProviderSelector';
-import { AiProviderId, loadAiSettings, saveAiSettings } from '../lib/ai-settings';
+import {
+  AiProviderId,
+  defaultModelForProvider,
+  loadAiSettings,
+  saveAiSettings,
+  showAiProviderPickerInModals,
+} from '../lib/ai-settings';
+import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 
 interface ImageGeneratorProps {
   meal: Meal;
@@ -12,12 +19,33 @@ interface ImageGeneratorProps {
 }
 
 export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGeneratorProps) {
-  const initialSettings = loadAiSettings();
+  const { runWithAiJob } = useAiJobQueue();
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
   const [size, setSize] = useState('1K');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [provider, setProvider] = useState<AiProviderId>('gemini');
-  const [model, setModel] = useState(() => (initialSettings.provider === 'gemini' ? initialSettings.model : ''));
+  const [model, setModel] = useState(() => {
+    const s = loadAiSettings();
+    return s.provider === 'gemini' ? s.model : defaultModelForProvider('gemini');
+  });
+
+  useEffect(() => {
+    const sync = () => {
+      const s = loadAiSettings();
+      setProvider('gemini');
+      setModel(s.provider === 'gemini' ? s.model : defaultModelForProvider('gemini'));
+    };
+    sync();
+    window.addEventListener('arpa-ai-settings-updated', sync);
+    return () => window.removeEventListener('arpa-ai-settings-updated', sync);
+  }, []);
 
   const handleGenerate = async () => {
     if (provider !== 'gemini') {
@@ -28,24 +56,49 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
     setError('');
 
     try {
-      const res = await apiFetch('/api/ai/generate-meal-image', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mealId: meal.id,
-          size,
-          provider,
-          model: model.trim() || undefined,
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data.error || 'Image generation failed');
-      }
-      if (!data.imageUrl) {
-        throw new Error('No image returned');
-      }
-      onSuccess(data.imageUrl as string);
+      await runWithAiJob(
+        {
+          kind: 'generate-meal-image',
+          title: 'Generate meal image',
+          relatedLabel: meal.name,
+          providerId: provider,
+          modelLabel: aiJobModelLabel(provider, model),
+          buildRestore: (result: { mealId: number; imageUrl: string }) => ({
+            path: '/',
+            state: {
+              addMealRestore: {
+                mealId: result.mealId,
+                partial: { image_url: result.imageUrl },
+                scrollToIngredients: false,
+              },
+            },
+          }),
+        },
+        async () => {
+          const res = await apiFetch('/api/ai/generate-meal-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mealId: meal.id,
+              size,
+              provider,
+              model: model.trim() || undefined,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(data.error || 'Image generation failed');
+          }
+          if (!data.imageUrl) {
+            throw new Error('No image returned');
+          }
+          const imageUrl = data.imageUrl as string;
+          if (mountedRef.current) {
+            onSuccess(imageUrl);
+          }
+          return { mealId: meal.id, imageUrl };
+        },
+      );
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
@@ -55,17 +108,17 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
 
   const handleProviderChange = (next: AiProviderId) => {
     setProvider(next);
-    saveAiSettings({ provider: next, model });
+    if (showAiProviderPickerInModals()) saveAiSettings({ provider: next, model });
   };
 
   const handleModelChange = (next: string) => {
     setModel(next);
-    saveAiSettings({ provider, model: next });
+    if (showAiProviderPickerInModals()) saveAiSettings({ provider, model: next });
   };
 
   return (
     <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-surface dark:bg-stone-900 rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden border border-outline-variant/15 dark:border-stone-800">
+      <div className="bg-surface rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden border border-outline-variant/15">
         <div className="px-6 py-5 flex justify-between items-start">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center">
@@ -89,23 +142,29 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
         </div>
 
         <div className="px-6 pb-2 space-y-4">
-          <p className="text-sm text-on-surface-variant dark:text-stone-400 leading-relaxed">
+          <p className="text-sm text-on-surface-variant leading-relaxed">
             Generate a custom illustration for{' '}
-            <strong className="text-on-surface dark:text-stone-100 font-display font-bold">
+            <strong className="text-on-surface font-display font-bold">
               {meal.name}
             </strong>
             .
           </p>
 
-          <div>
-            <AiProviderSelector
-              provider={provider}
-              model={model}
-              onProviderChange={handleProviderChange}
-              onModelChange={handleModelChange}
-              disableImageProviders
-            />
-          </div>
+          {showAiProviderPickerInModals() ? (
+            <div>
+              <AiProviderSelector
+                provider={provider}
+                model={model}
+                onProviderChange={handleProviderChange}
+                onModelChange={handleModelChange}
+                disableImageProviders
+              />
+            </div>
+          ) : (
+            <p className="text-xs text-on-surface-variant">
+              Meal images always use Google. Model follows your Gemini settings when applicable; otherwise the Google default applies.
+            </p>
+          )}
 
           <div>
             <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline mb-2">
@@ -114,7 +173,7 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
             <select
               value={size}
               onChange={(e) => setSize(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-container-lowest dark:bg-stone-800 border border-outline-variant/30 dark:border-stone-700 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface dark:text-stone-100"
+              className="w-full px-4 py-3 bg-surface-container-lowest border border-outline-variant/30 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 text-on-surface"
             >
               <option value="1K">1K · Standard</option>
               <option value="2K">2K · High Quality</option>
@@ -129,10 +188,10 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
           )}
         </div>
 
-        <div className="px-6 py-4 mt-4 bg-surface-container-low dark:bg-stone-800/40 flex justify-end gap-3 border-t border-outline-variant/15 dark:border-stone-800">
+        <div className="px-6 py-4 mt-4 bg-surface-container-low/95 flex justify-end gap-3 border-t border-outline-variant/15">
           <button
             onClick={onClose}
-            className="px-5 py-2.5 text-on-surface-variant dark:text-stone-300 font-display font-semibold text-sm rounded-full hover:bg-surface-container-high dark:hover:bg-stone-700 transition-colors"
+            className="px-5 py-2.5 text-on-surface-variant font-display font-semibold text-sm rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors"
           >
             Cancel
           </button>

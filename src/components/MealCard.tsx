@@ -11,6 +11,7 @@ import {
 import { Meal } from '../types';
 import ImageGenerator from './ImageGenerator';
 import MealDetailsModal from './MealDetailsModal';
+import { getMealBaseServings, getScaledMealNutritionTotals } from '../lib/meal-scaling';
 
 interface MealCardProps {
   meal: Meal;
@@ -23,16 +24,18 @@ export default function MealCard({ meal, onDelete, onEdit }: MealCardProps) {
   const [showImageGen, setShowImageGen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
 
-  const totalCalories = meal.ingredients.reduce((sum, ing) => sum + (ing.calories || 0), 0);
-  const totalProtein = meal.ingredients.reduce((sum, ing) => sum + (ing.protein || 0), 0);
+  const totals = getScaledMealNutritionTotals(meal, meal.servings);
+  const totalCalories = totals.calories;
+  const totalProtein = totals.protein;
+  const servings = getMealBaseServings(meal);
 
   return (
     <>
       <article
-        className="bg-surface-container-lowest dark:bg-stone-900 rounded-[2rem] overflow-hidden flex flex-col transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer border border-outline-variant/15 dark:border-stone-800 group"
+        className="bg-surface-container-lowest rounded-[2rem] overflow-hidden flex flex-col transition-all hover:-translate-y-0.5 hover:shadow-lg cursor-pointer border border-outline-variant/15 group"
         onClick={() => setShowDetails(true)}
       >
-        <div className="relative h-48 bg-surface-container-high dark:bg-stone-800 flex items-center justify-center overflow-hidden">
+        <div className="relative h-48 bg-surface-container-high flex items-center justify-center overflow-hidden">
           {meal.image_url ? (
             <img
               src={meal.image_url}
@@ -60,14 +63,14 @@ export default function MealCard({ meal, onDelete, onEdit }: MealCardProps) {
               </button>
 
               {showMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest dark:bg-stone-800 rounded-2xl shadow-xl py-1 z-10 border border-outline-variant/20 dark:border-stone-700">
+                <div className="absolute right-0 mt-2 w-48 bg-surface-container-lowest rounded-2xl shadow-xl py-1 z-10 border border-outline-variant/20 dark:border-outline-variant">
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setShowMenu(false);
                       onEdit();
                     }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-on-surface dark:text-stone-200 hover:bg-surface-container-low dark:hover:bg-stone-700 inline-flex items-center gap-2"
+                    className="w-full text-left px-4 py-2.5 text-sm text-on-surface hover:bg-surface-container-low dark:hover:bg-surface-container-highest inline-flex items-center gap-2"
                   >
                     <Edit2 className="w-4 h-4" /> Edit Meal
                   </button>
@@ -77,7 +80,7 @@ export default function MealCard({ meal, onDelete, onEdit }: MealCardProps) {
                       setShowMenu(false);
                       setShowImageGen(true);
                     }}
-                    className="w-full text-left px-4 py-2.5 text-sm text-on-surface dark:text-stone-200 hover:bg-surface-container-low dark:hover:bg-stone-700 inline-flex items-center gap-2"
+                    className="w-full text-left px-4 py-2.5 text-sm text-on-surface hover:bg-surface-container-low dark:hover:bg-surface-container-highest inline-flex items-center gap-2"
                   >
                     <ImageIcon className="w-4 h-4" /> Generate Image
                   </button>
@@ -107,7 +110,7 @@ export default function MealCard({ meal, onDelete, onEdit }: MealCardProps) {
         </div>
 
         <div className="p-5 flex-1 flex flex-col">
-          <h3 className="text-lg font-display font-extrabold text-on-surface dark:text-stone-100 mb-3 leading-tight">
+          <h3 className="text-lg font-display font-extrabold text-on-surface mb-3 leading-tight">
             {meal.name}
           </h3>
 
@@ -117,9 +120,9 @@ export default function MealCard({ meal, onDelete, onEdit }: MealCardProps) {
                 <Flame className="w-3 h-3" />
                 {totalCalories.toFixed(0)} kcal
               </div>
-              <div className="bg-surface-container-high dark:bg-stone-800 text-on-surface-variant px-2.5 py-1.5 rounded-full inline-flex items-center gap-1">
+              <div className="bg-surface-container-high text-on-surface-variant px-2.5 py-1.5 rounded-full inline-flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                {meal.ingredients.length} items
+                {meal.ingredients.length} items / {servings} servings
               </div>
             </div>
           )}
@@ -132,7 +135,7 @@ export default function MealCard({ meal, onDelete, onEdit }: MealCardProps) {
               {meal.ingredients.slice(0, 4).map((ing, i) => (
                 <li
                   key={i}
-                  className="text-sm text-on-surface-variant dark:text-stone-300 flex justify-between gap-3"
+                  className="text-sm text-on-surface-variant flex justify-between gap-3"
                 >
                   <span className="truncate">{ing.name}</span>
                   <span className="text-outline whitespace-nowrap font-display font-semibold">

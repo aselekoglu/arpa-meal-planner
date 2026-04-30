@@ -14,6 +14,7 @@ export interface Meal {
   id: number;
   name: string;
   tag: string;
+  servings: number;
   image_url: string | null;
   instructions: string[] | null;
   source_url: string | null;
@@ -25,6 +26,7 @@ export interface PlannerItem {
   date: string;
   meal_id: number;
   meal_name: string;
+  servings_override: number | null;
 }
 
 export interface PantryItem {
