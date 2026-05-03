@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import AiProviderSelector from '../components/AiProviderSelector';
+import ResponseLanguageSelector from '../components/ResponseLanguageSelector';
 import {
+  AiLanguageUiMode,
   AiProviderId,
   AiProviderUiMode,
+  ResponseLanguageCode,
   defaultModelForProvider,
   loadAiSettings,
+  saveAiLanguageUiMode,
   saveAiProviderUiMode,
   saveAiSettings,
 } from '../lib/ai-settings';
@@ -27,6 +31,12 @@ export default function Preferences() {
   );
   const [provider, setProvider] = useState<AiProviderId>(() => loadAiSettings().provider);
   const [model, setModel] = useState(() => loadAiSettings().model);
+  const [languageUiMode, setLanguageUiModeState] = useState<AiLanguageUiMode>(
+    () => loadAiSettings().languageUiMode ?? 'per_request',
+  );
+  const [responseLanguage, setResponseLanguage] = useState<ResponseLanguageCode>(
+    () => loadAiSettings().responseLanguage ?? 'auto',
+  );
   const [servingsSaved, setServingsSaved] = useState(false);
 
   useEffect(() => {
@@ -35,6 +45,8 @@ export default function Preferences() {
       setProvider(s.provider);
       setModel(s.model);
       setProviderUiModeState(s.providerUiMode ?? 'per_request');
+      setLanguageUiModeState(s.languageUiMode ?? 'per_request');
+      setResponseLanguage(s.responseLanguage ?? 'auto');
     };
     window.addEventListener('arpa-ai-settings-updated', syncAi);
     return () => window.removeEventListener('arpa-ai-settings-updated', syncAi);
@@ -66,6 +78,8 @@ export default function Preferences() {
       provider: next,
       model: model.trim() ? model : defaultModelForProvider(next),
       providerUiMode,
+      languageUiMode,
+      responseLanguage,
     };
     setProvider(nextSettings.provider);
     setModel(nextSettings.model);
@@ -74,7 +88,29 @@ export default function Preferences() {
 
   const handleModelChange = (next: string) => {
     setModel(next);
-    saveAiSettings({ provider, model: next, providerUiMode });
+    saveAiSettings({
+      provider,
+      model: next,
+      providerUiMode,
+      languageUiMode,
+      responseLanguage,
+    });
+  };
+
+  const handleLanguageUiModeChange = (mode: AiLanguageUiMode) => {
+    setLanguageUiModeState(mode);
+    saveAiLanguageUiMode(mode);
+  };
+
+  const handleResponseLanguageChange = (next: ResponseLanguageCode) => {
+    setResponseLanguage(next);
+    saveAiSettings({
+      provider,
+      model,
+      providerUiMode,
+      languageUiMode,
+      responseLanguage: next,
+    });
   };
 
   return (
@@ -220,6 +256,55 @@ export default function Preferences() {
           model={model}
           onProviderChange={handleProviderChange}
           onModelChange={handleModelChange}
+        />
+
+        <div className="space-y-2 pt-2 border-t border-outline-variant/15">
+          <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline">
+            Language UI
+          </label>
+          <div className="flex flex-col gap-2">
+            <label className="flex items-start gap-3 cursor-pointer text-sm text-on-surface">
+              <input
+                type="radio"
+                name="languageUiMode"
+                checked={languageUiMode === 'per_request'}
+                onChange={() => handleLanguageUiModeChange('per_request')}
+                className="mt-1"
+              />
+              <span>
+                <span className="font-display font-semibold">Choose language per request</span>
+                <span className="block text-on-surface-variant text-xs mt-0.5">
+                  Show language selection on import, plan generation, grocery grouping, and meal AI actions.
+                  Chat follows your message language automatically.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 cursor-pointer text-sm text-on-surface">
+              <input
+                type="radio"
+                name="languageUiMode"
+                checked={languageUiMode === 'global_only'}
+                onChange={() => handleLanguageUiModeChange('global_only')}
+                className="mt-1"
+              />
+              <span>
+                <span className="font-display font-semibold">Use one language for structured AI</span>
+                <span className="block text-on-surface-variant text-xs mt-0.5">
+                  Hide inline language pickers; import, plans, groceries, and meal AI use the language below.
+                </span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <ResponseLanguageSelector
+          value={responseLanguage}
+          onChange={handleResponseLanguageChange}
+          helperText={
+            responseLanguage === 'auto'
+              ? 'Auto infers language from your inputs when possible; otherwise uses your browser locale as a hint.'
+              : undefined
+          }
         />
 
         <p className="text-[11px] text-outline leading-relaxed">

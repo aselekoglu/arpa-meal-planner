@@ -3,12 +3,17 @@ import { X, Sparkles, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { apiFetch } from '../lib/api';
 import AiProviderSelector from './AiProviderSelector';
+import ResponseLanguageSelector from './ResponseLanguageSelector';
 import {
   AiProviderId,
+  ResponseLanguageCode,
+  aiJobLanguageLabel,
   defaultModelForProvider,
   loadAiSettings,
   saveAiSettings,
   showAiProviderPickerInModals,
+  showLanguagePickerInModals,
+  structuredAiLanguagePayload,
 } from '../lib/ai-settings';
 import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 
@@ -42,12 +47,16 @@ export default function GeneratePlanModal({
   const [error, setError] = useState('');
   const [provider, setProvider] = useState<AiProviderId>(() => loadAiSettings().provider);
   const [model, setModel] = useState(() => loadAiSettings().model);
+  const [responseLanguage, setResponseLanguage] = useState<ResponseLanguageCode>(
+    () => loadAiSettings().responseLanguage ?? 'auto',
+  );
 
   useEffect(() => {
     const sync = () => {
       const s = loadAiSettings();
       setProvider(s.provider);
       setModel(s.model);
+      setResponseLanguage(s.responseLanguage ?? 'auto');
     };
     sync();
     window.addEventListener('arpa-ai-settings-updated', sync);
@@ -59,6 +68,7 @@ export default function GeneratePlanModal({
     const s = loadAiSettings();
     setProvider(s.provider);
     setModel(s.model);
+    setResponseLanguage(s.responseLanguage ?? 'auto');
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -76,6 +86,7 @@ export default function GeneratePlanModal({
           relatedLabel: related,
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
+          languageLabel: aiJobLanguageLabel(responseLanguage),
           buildRestore: () => ({
             path: '/planner',
             state: { plannerRefresh: true },
@@ -90,6 +101,7 @@ export default function GeneratePlanModal({
               diet,
               provider,
               model: model.trim() || undefined,
+              ...structuredAiLanguagePayload(responseLanguage),
             }),
           });
           const data = await res.json().catch(() => ({}));
@@ -123,6 +135,11 @@ export default function GeneratePlanModal({
   const handleModelChange = (next: string) => {
     setModel(next);
     if (showAiProviderPickerInModals()) saveAiSettings({ provider, model: next });
+  };
+
+  const handleResponseLanguageChange = (next: ResponseLanguageCode) => {
+    setResponseLanguage(next);
+    if (showLanguagePickerInModals()) saveAiSettings({ provider, model, responseLanguage: next });
   };
 
   return (
@@ -171,6 +188,14 @@ export default function GeneratePlanModal({
           ) : (
             <p className="text-xs text-on-surface-variant">
               Using saved AI provider from Preferences.
+            </p>
+          )}
+
+          {showLanguagePickerInModals() ? (
+            <ResponseLanguageSelector value={responseLanguage} onChange={handleResponseLanguageChange} />
+          ) : (
+            <p className="text-xs text-on-surface-variant">
+              Using saved response language from Preferences.
             </p>
           )}
 

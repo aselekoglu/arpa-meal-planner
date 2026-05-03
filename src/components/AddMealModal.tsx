@@ -15,7 +15,15 @@ import {
 import { Meal, Ingredient } from '../types';
 import { apiFetch } from '../lib/api';
 import { APPROVED_MEASURE_LABELS } from '../lib/units';
-import { loadAiSettings } from '../lib/ai-settings';
+import ResponseLanguageSelector from './ResponseLanguageSelector';
+import {
+  ResponseLanguageCode,
+  aiJobLanguageLabel,
+  loadAiSettings,
+  saveAiSettings,
+  showLanguagePickerInModals,
+  structuredAiLanguagePayload,
+} from '../lib/ai-settings';
 import { loadDefaultServings } from '../lib/preferences';
 import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 import { applyNutritionEstimatesToIngredients } from '../lib/ai-job-apply';
@@ -57,6 +65,9 @@ export default function AddMealModal({
   const [isFetchingInstructions, setIsFetchingInstructions] = useState(false);
   const [instructionsError, setInstructionsError] = useState<string | null>(null);
   const [instructionsInfo, setInstructionsInfo] = useState<string | null>(null);
+  const [responseLanguage, setResponseLanguage] = useState<ResponseLanguageCode>(
+    () => loadAiSettings().responseLanguage ?? 'auto',
+  );
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const ingredientsSectionRef = useRef<HTMLDivElement>(null);
@@ -110,6 +121,29 @@ export default function AddMealModal({
       stopCamera();
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    const sync = () => setResponseLanguage(loadAiSettings().responseLanguage ?? 'auto');
+    sync();
+    window.addEventListener('arpa-ai-settings-updated', sync);
+    return () => window.removeEventListener('arpa-ai-settings-updated', sync);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setResponseLanguage(loadAiSettings().responseLanguage ?? 'auto');
+  }, [isOpen]);
+
+  const effectiveResponseLanguage = (): ResponseLanguageCode =>
+    showLanguagePickerInModals() ? responseLanguage : (loadAiSettings().responseLanguage ?? 'auto');
+
+  const handleResponseLanguageChange = (next: ResponseLanguageCode) => {
+    setResponseLanguage(next);
+    if (showLanguagePickerInModals()) {
+      const cur = loadAiSettings();
+      saveAiSettings({ ...cur, responseLanguage: next });
+    }
+  };
 
   const startCamera = async () => {
     try {
@@ -205,6 +239,7 @@ export default function AddMealModal({
 
     setIsEstimatingNutrition(true);
     const { provider, model } = loadAiSettings();
+    const lang = effectiveResponseLanguage();
     const mealLabel = (name.trim() || 'Untitled meal').slice(0, 80);
     const ingredientSnapshot = ingredients.map((i) => ({ ...i }));
     const nameSnap = name.trim();
@@ -223,6 +258,7 @@ export default function AddMealModal({
           relatedLabel: mealLabel,
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
+          languageLabel: aiJobLanguageLabel(lang),
           buildRestore: (result: { mealId: number | null; partial: Partial<Meal> }) => ({
             path: '/',
             state: {
@@ -243,6 +279,7 @@ export default function AddMealModal({
               ingredients: validIngredients,
               provider,
               model: model.trim() || undefined,
+              ...structuredAiLanguagePayload(lang),
             }),
           });
           const data = await res.json().catch(() => ({}));
@@ -292,6 +329,7 @@ export default function AddMealModal({
 
     setIsFetchingInstructions(true);
     const { provider, model } = loadAiSettings();
+    const lang = effectiveResponseLanguage();
     const mealLabel = name.trim().slice(0, 80);
     const ingredientSnapshot = ingredients.map((i) => ({ ...i }));
     const nameSnap = name.trim();
@@ -309,6 +347,7 @@ export default function AddMealModal({
           relatedLabel: mealLabel || 'Meal',
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
+          languageLabel: aiJobLanguageLabel(lang),
           buildRestore: (result: { mealId: number | null; partial: Partial<Meal> }) => ({
             path: '/',
             state: {
@@ -330,6 +369,7 @@ export default function AddMealModal({
               ingredients: validIngredients,
               provider,
               model: model.trim() || undefined,
+              ...structuredAiLanguagePayload(lang),
             }),
           });
           const data = await res.json().catch(() => ({}));
@@ -586,6 +626,17 @@ export default function AddMealModal({
                 <canvas ref={canvasRef} className="hidden" />
               </div>
             </div>
+
+            {showLanguagePickerInModals() ? (
+              <ResponseLanguageSelector
+                value={responseLanguage}
+                onChange={handleResponseLanguageChange}
+              />
+            ) : (
+              <p className="text-xs text-on-surface-variant">
+                Using saved response language from Preferences for AI instructions and nutrition.
+              </p>
+            )}
 
             <div>
               <div className="flex justify-between items-center mb-3">

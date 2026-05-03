@@ -3,12 +3,17 @@ import { X, Search, Loader2, Link as LinkIcon, Globe } from 'lucide-react';
 import { Meal } from '../types';
 import { apiFetch } from '../lib/api';
 import AiProviderSelector from './AiProviderSelector';
+import ResponseLanguageSelector from './ResponseLanguageSelector';
 import {
   AiProviderId,
+  ResponseLanguageCode,
+  aiJobLanguageLabel,
   defaultModelForProvider,
   loadAiSettings,
   saveAiSettings,
   showAiProviderPickerInModals,
+  showLanguagePickerInModals,
+  structuredAiLanguagePayload,
 } from '../lib/ai-settings';
 import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 
@@ -32,12 +37,16 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
   const [error, setError] = useState('');
   const [provider, setProvider] = useState<AiProviderId>(() => loadAiSettings().provider);
   const [model, setModel] = useState(() => loadAiSettings().model);
+  const [responseLanguage, setResponseLanguage] = useState<ResponseLanguageCode>(
+    () => loadAiSettings().responseLanguage ?? 'auto',
+  );
 
   useEffect(() => {
     const sync = () => {
       const s = loadAiSettings();
       setProvider(s.provider);
       setModel(s.model);
+      setResponseLanguage(s.responseLanguage ?? 'auto');
     };
     sync();
     window.addEventListener('arpa-ai-settings-updated', sync);
@@ -49,6 +58,7 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
     const s = loadAiSettings();
     setProvider(s.provider);
     setModel(s.model);
+    setResponseLanguage(s.responseLanguage ?? 'auto');
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -69,6 +79,7 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
           relatedLabel: related,
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
+          languageLabel: aiJobLanguageLabel(responseLanguage),
           buildRestore: (meal: Partial<Meal>) => ({
             path: '/',
             state: {
@@ -88,6 +99,7 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
               query: q,
               provider,
               model: model.trim() || undefined,
+              ...structuredAiLanguagePayload(responseLanguage),
             }),
           });
           const data = await res.json().catch(() => ({}));
@@ -128,6 +140,11 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
   const handleModelChange = (next: string) => {
     setModel(next);
     if (showAiProviderPickerInModals()) saveAiSettings({ provider, model: next });
+  };
+
+  const handleResponseLanguageChange = (next: ResponseLanguageCode) => {
+    setResponseLanguage(next);
+    if (showLanguagePickerInModals()) saveAiSettings({ provider, model, responseLanguage: next });
   };
 
   return (
@@ -172,6 +189,14 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
           ) : (
             <p className="text-xs text-on-surface-variant">
               Using saved AI provider from Preferences.
+            </p>
+          )}
+
+          {showLanguagePickerInModals() ? (
+            <ResponseLanguageSelector value={responseLanguage} onChange={handleResponseLanguageChange} />
+          ) : (
+            <p className="text-xs text-on-surface-variant">
+              Using saved response language from Preferences.
             </p>
           )}
 

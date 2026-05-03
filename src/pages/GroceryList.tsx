@@ -22,12 +22,17 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { apiFetch } from '../lib/api';
 import AiProviderSelector from '../components/AiProviderSelector';
+import ResponseLanguageSelector from '../components/ResponseLanguageSelector';
 import {
   AiProviderId,
+  ResponseLanguageCode,
+  aiJobLanguageLabel,
   defaultModelForProvider,
   loadAiSettings,
   saveAiSettings,
   showAiProviderPickerInModals,
+  showLanguagePickerInModals,
+  structuredAiLanguagePayload,
 } from '../lib/ai-settings';
 import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 import { isAiJobNavigationState, type AiJobNavigationState } from '../lib/ai-job-nav-state';
@@ -201,6 +206,9 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
   const [isMerging, setIsMerging] = useState(false);
   const [provider, setProvider] = useState<AiProviderId>(() => loadAiSettings().provider);
   const [model, setModel] = useState(() => loadAiSettings().model);
+  const [responseLanguage, setResponseLanguage] = useState<ResponseLanguageCode>(
+    () => loadAiSettings().responseLanguage ?? 'auto',
+  );
   const { runWithAiJob } = useAiJobQueue();
   const location = useLocation();
   const navigate = useNavigate();
@@ -579,6 +587,7 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
               : `Grocery list (${itemsToGroup.length} items)`,
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
+          languageLabel: aiJobLanguageLabel(responseLanguage),
           buildRestore: (merged: Record<string, string>) => ({
             path: '/grocery',
             state: { groceryCategoriesRestore: { categories: merged } },
@@ -592,6 +601,7 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
               items: itemsToGroup,
               provider,
               model: model.trim() || undefined,
+              ...structuredAiLanguagePayload(responseLanguage),
             }),
           });
           const data = await res.json().catch(() => ({}));
@@ -684,11 +694,17 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
       const s = loadAiSettings();
       setProvider(s.provider);
       setModel(s.model);
+      setResponseLanguage(s.responseLanguage ?? 'auto');
     };
     sync();
     window.addEventListener('arpa-ai-settings-updated', sync);
     return () => window.removeEventListener('arpa-ai-settings-updated', sync);
   }, []);
+
+  const handleResponseLanguageChange = (next: ResponseLanguageCode) => {
+    setResponseLanguage(next);
+    if (showLanguagePickerInModals()) saveAiSettings({ provider, model, responseLanguage: next });
+  };
 
   const handleProviderChange = (next: AiProviderId) => {
     const nextSettings = {
@@ -953,6 +969,18 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
                           ) : (
                             <p className="text-xs text-on-surface-variant">
                               Using saved AI provider from Preferences.
+                            </p>
+                          )}
+                          {showLanguagePickerInModals() ? (
+                            <div className="mt-3">
+                              <ResponseLanguageSelector
+                                value={responseLanguage}
+                                onChange={handleResponseLanguageChange}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-xs text-on-surface-variant mt-3">
+                              Using saved response language from Preferences.
                             </p>
                           )}
                           <div className="mt-3 flex justify-end gap-2">

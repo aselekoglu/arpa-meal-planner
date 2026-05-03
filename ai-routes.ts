@@ -3,6 +3,13 @@ import { addDays, format, parseISO } from 'date-fns';
 import db from './db.js';
 import { getMealsWithIngredients } from './meal-queries.js';
 import { resolveProvider } from './ai/provider-resolver.js';
+import {
+  CHAT_CONTEXT_LANGUAGE_INSTRUCTION,
+  buildFetchInstructionsLanguageLead,
+  buildStructuredLanguageInstruction,
+  buildStructuredLanguageSystemInstruction,
+} from './ai/language-instructions.js';
+import { normalizeLanguageInput } from './ai/response-languages.js';
 import { AiProviderError, AiTaskOptions } from './ai/types.js';
 
 type ImportedRecipe = {
@@ -62,6 +69,25 @@ function getTaskOptions(req: Request, task: AiTaskOptions['task'], extras: Parti
   };
 }
 
+/** Explicit locale → systemInstruction only; auto → trailing user prompt hint (localeHint fallback). */
+function resolvedStructuredLanguage(req: Request): {
+  promptSuffix: string;
+  systemInstruction?: string;
+} {
+  const language = normalizeLanguageInput(req.body?.language);
+  const localeHintRaw = req.body?.localeHint;
+  const opts = { language, localeHintRaw };
+  if (language !== 'auto') {
+    return {
+      promptSuffix: '',
+      systemInstruction: buildStructuredLanguageSystemInstruction(opts),
+    };
+  }
+  return {
+    promptSuffix: buildStructuredLanguageInstruction(opts),
+  };
+}
+
 function aiError(res: Response, err: unknown, fallback: string) {
   const message = err instanceof Error ? err.message : fallback;
   const status =
@@ -99,7 +125,9 @@ export function registerAiRoutes(app: Express) {
           : '\n\nThe user currently has no saved meals.';
 
       const text = await provider.generateText(message, getTaskOptions(req, 'chat', {
-        systemInstruction: `You are a helpful meal planning assistant. You can help users come up with recipes, meal plans, and answer questions about cooking. Use the user's meal database to suggest meals they already know how to make, or build meal plans based on their saved recipes.${contextString}`,
+        systemInstruction: `You are a helpful meal planning assistant. You can help users come up with recipes, meal plans, and answer questions about cooking. Use the user's meal database to suggest meals they already know how to make, or build meal plans based on their saved recipes.${contextString}
+
+${CHAT_CONTEXT_LANGUAGE_INSTRUCTION}`,
       }));
       return res.json({ text });
     } catch (err) {
@@ -114,6 +142,7 @@ export function registerAiRoutes(app: Express) {
     }
 
     try {
+      const langParts = resolvedStructuredLanguage(req);
       const provider = resolveProvider(req.body?.provider);
       const supportsSearch = provider.id === 'gemini';
       const prompt = `Search for a recipe for "${query}". 
@@ -134,10 +163,11 @@ export function registerAiRoutes(app: Express) {
         supportsSearch
           ? ''
           : '\nIf live web search is unavailable, infer a plausible recipe from prior knowledge and set source_url to an empty string.'
-      }`;
+      }${langParts.promptSuffix}`;
 
       const data = await provider.generateJson<ImportedRecipe>(prompt, getTaskOptions(req, 'import-recipe', {
         useWebSearch: supportsSearch,
+        ...(langParts.systemInstruction ? { systemInstruction: langParts.systemInstruction } : {}),
       }));
       if (!data.name || !data.ingredients) {
         return res.status(422).json({ error: 'Failed to parse recipe data. Please try another query.' });
@@ -171,6 +201,14 @@ export function registerAiRoutes(app: Express) {
 
     try {
       const provider = resolveProvider(req.body?.provider);
+      const language = normalizeLanguageInput(req.body?.language);
+      const localeHintRaw = req.body?.localeHint;
+      // Nutrition merge keys off input names — do not use translate-all system prompts here.
+      const nutritionPromptSuffix =
+        language === 'auto' ?
+          buildStructuredLanguageInstruction({ language, localeHintRaw })
+        : '';
+
       const prompt = `Estimate nutritional values for each ingredient in the meal "${mealName}".
 Return ONLY valid JSON with this exact shape:
 {
@@ -179,7 +217,7 @@ Return ONLY valid JSON with this exact shape:
   ]
 }
 Use this input ingredient list and preserve each ingredient's name, amount, and measure:
-${JSON.stringify(ingredients, null, 2)}`;
+${JSON.stringify(ingredients, null, 2)}${nutritionPromptSuffix}`;
 
       const data = await provider.generateJson<{ ingredients?: Array<Record<string, unknown>> }>(
         prompt,
@@ -238,9 +276,14 @@ ${JSON.stringify(ingredients, null, 2)}`;
       : [];
 
     try {
+      const fetchLangOpts = {
+        language: normalizeLanguageInput(req.body?.language),
+        localeHintRaw: req.body?.localeHint,
+      };
+      const fetchLead = buildFetchInstructionsLanguageLead(fetchLangOpts);
       const provider = resolveProvider(req.body?.provider);
       const supportsSearch = provider.id === 'gemini';
-      const prompt = `Find a step-by-step recipe for "${mealName}".
+      const prompt = `${fetchLead.userPromptPrefix}Find a step-by-step recipe for "${mealName}".
 ${sourceUrl ? `Prioritize this source URL: ${sourceUrl}.` : 'Use the best available public source.'}
 ${ingredients.length > 0 ? `Use these ingredients as context: ${ingredients.join(', ')}.` : ''}
 Return ONLY valid JSON:
@@ -252,7 +295,10 @@ Ensure instructions are clear, sequential cooking steps.`;
 
       const data = await provider.generateJson<{ instructions?: unknown[]; sourceUrl?: string }>(
         prompt,
-        getTaskOptions(req, 'import-recipe', { useWebSearch: supportsSearch })
+        getTaskOptions(req, 'import-recipe', {
+          useWebSearch: supportsSearch,
+          ...(fetchLead.systemInstruction ? { systemInstruction: fetchLead.systemInstruction } : {}),
+        })
       );
       const normalizedInstructions = Array.isArray(data.instructions)
         ? data.instructions.map((step) => String(step).trim()).filter(Boolean)
@@ -285,6 +331,7 @@ Ensure instructions are clear, sequential cooking steps.`;
     }
 
     try {
+      const langParts = resolvedStructuredLanguage(req);
       const provider = resolveProvider(req.body?.provider);
       const prompt = `Generate a 7-day dinner meal plan for a ${diet} diet.
       Return a JSON object with a 'meals' array containing exactly 7 meals (one for each day of the week).
@@ -310,9 +357,14 @@ Ensure instructions are clear, sequential cooking steps.`;
           "servings": number,
           "ingredients": [{ "name": string, "amount": number, "measure": string, "calories": number, "protein": number, "fat": number, "carbs": number }]
         }]
-      }`;
+      }${langParts.promptSuffix}`;
 
-      const data = await provider.generateJson<GeneratedMealPlan>(prompt, getTaskOptions(req, 'generate-plan'));
+      const data = await provider.generateJson<GeneratedMealPlan>(
+        prompt,
+        getTaskOptions(req, 'generate-plan', {
+          ...(langParts.systemInstruction ? { systemInstruction: langParts.systemInstruction } : {}),
+        })
+      );
       if (!data.meals || !Array.isArray(data.meals) || data.meals.length !== 7) {
         return res.status(422).json({ error: 'Failed to generate a complete 7-day meal plan. Please try again.' });
       }
@@ -376,11 +428,14 @@ Ensure instructions are clear, sequential cooking steps.`;
     }
 
     try {
+      const langParts = resolvedStructuredLanguage(req);
       const provider = resolveProvider(req.body?.provider);
       const prompt = `Categorize these grocery items into standard supermarket aisles (e.g., Produce, Dairy, Meat, Pantry, Bakery, Frozen, Household). Return a JSON object mapping each item name to its category. Items: ${names.join(', ')}`;
       const categories = await provider.generateJson<Record<string, string>>(
-        `${prompt}\nReturn only valid JSON where each key is one of the provided item names and each value is a category string.`,
-        getTaskOptions(req, 'grocery-group')
+        `${prompt}\nReturn only valid JSON where each key is one of the provided item names and each value is a category string.${langParts.promptSuffix}`,
+        getTaskOptions(req, 'grocery-group', {
+          ...(langParts.systemInstruction ? { systemInstruction: langParts.systemInstruction } : {}),
+        })
       );
       return res.json({ categories });
     } catch (err) {

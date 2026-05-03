@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import http from 'node:http';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import db from './db.js';
@@ -598,10 +599,15 @@ async function startServer() {
 
   registerAiRoutes(app);
 
-  // Vite middleware for development
+  const server = http.createServer(app);
+
+  // Vite middleware for development (shared http.Server so HMR works over LAN IP)
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: { server },
+      },
       appType: 'spa',
     });
     app.use(vite.middlewares);
@@ -609,8 +615,11 @@ async function startServer() {
     app.use(express.static('dist'));
   }
 
-  app.listen(PORT, HOST, () => {
+  server.listen(PORT, HOST, () => {
     console.log(`Server running on http://${HOST}:${PORT}`);
+    if (HOST === '0.0.0.0') {
+      console.log('Open from another device on WiFi using this machine LAN IP and port', PORT);
+    }
   });
 }
 

@@ -118,6 +118,11 @@ export default function AiJobQueuePanel() {
                     <p className="mt-1 truncate text-[11px] text-outline">
                       {formatAiServiceLine(job.providerId, job.modelLabel)}
                     </p>
+                    {job.languageLabel ? (
+                      <p className="mt-0.5 truncate text-[11px] text-outline">
+                        Language · {job.languageLabel}
+                      </p>
+                    ) : null}
                     {canOpenRestore ? (
                       <p className="mt-1 text-[11px] font-semibold text-primary-container dark:text-primary-fixed-dim">
                         Click to open in editor

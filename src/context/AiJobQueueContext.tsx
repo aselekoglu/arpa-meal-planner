@@ -32,6 +32,8 @@ export interface AiJob {
   relatedLabel?: string;
   providerId: AiProviderId;
   modelLabel: string;
+  /** Structured AI tasks only; omit for image generation. */
+  languageLabel?: string;
   status: AiJobStatus;
   error?: string;
   createdAt: number;
@@ -41,7 +43,7 @@ export interface AiJob {
 
 export type AiJobCreateMeta = Pick<
   AiJob,
-  'kind' | 'title' | 'relatedLabel' | 'providerId' | 'modelLabel'
+  'kind' | 'title' | 'relatedLabel' | 'providerId' | 'modelLabel' | 'languageLabel'
 >;
 
 export type AiJobRunMeta<T> = AiJobCreateMeta & {
