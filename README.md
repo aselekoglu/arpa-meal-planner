@@ -10,6 +10,34 @@
 
 Arpa is a comprehensive, full-stack meal planning application designed to streamline your kitchen workflow. It combines recipe management, weekly planning, pantry tracking, and AI-powered intelligence into one cohesive experience.
 
+## 🖼️ App Screenshots
+
+### Dashboard
+| Light | Dark |
+|---|---|
+| ![Arpa Dashboard Light](public/screenshots/dashboard-light.png) | ![Arpa Dashboard Dark](public/screenshots/dashboard-dark.png) |
+
+### Planner
+| Light | Dark |
+|---|---|
+| ![Arpa Planner Light](public/screenshots/planner-light.png) | ![Arpa Planner Dark](public/screenshots/planner-dark.png) |
+
+### Grocery List
+| Light | Dark |
+|---|---|
+| ![Arpa Grocery Light](public/screenshots/grocery-light.png) | ![Arpa Grocery Dark](public/screenshots/grocery-dark.png) |
+
+### Pantry
+| Light | Dark |
+|---|---|
+| ![Arpa Pantry Light](public/screenshots/pantry-light.png) | ![Arpa Pantry Dark](public/screenshots/pantry-dark.png) |
+
+### Additional Views
+- ![Arpa Meal Edit](public/screenshots/meal-edit-light.png)
+- ![Arpa Import Recipe](public/screenshots/import-recipe-dark.png)
+- ![Arpa Job Queue](public/screenshots/job-queue-dark.png)
+- ![Arpa Settings](public/screenshots/settings-dark.png)
+
 ---
 
 ## ✨ Features
