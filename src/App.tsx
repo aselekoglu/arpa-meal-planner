@@ -28,24 +28,25 @@ import {
   toggleExplicitThemeMode,
   ThemeMode,
 } from './lib/preferences';
+import { t } from 'i18next';
 
 const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/planner', label: 'Planner', icon: Calendar },
-  { to: '/grocery', label: 'Grocery List', icon: ShoppingBasket },
-  { to: '/pantry', label: 'Pantry', icon: Boxes },
+  { to: '/', label: t('app.nav.dashboard'), icon: LayoutDashboard, end: true },
+  { to: '/planner', label: t('app.nav.planner'), icon: Calendar },
+  { to: '/grocery', label: t('app.nav.grocery'), icon: ShoppingBasket },
+  { to: '/pantry', label: t('app.nav.pantry'), icon: Boxes },
 ];
 
 function PageTitle() {
   const location = useLocation();
   const map: Record<string, string> = {
-    '/': 'Dashboard',
-    '/planner': 'Weekly Planner',
-    '/grocery': 'Grocery List',
-    '/pantry': 'Pantry Inventory',
-    '/preferences': 'Preferences',
+    '/': t('app.pageTitle.dashboard'),
+    '/planner': t('app.pageTitle.planner'),
+    '/grocery': t('app.pageTitle.grocery'),
+    '/pantry': t('app.pageTitle.pantry'),
+    '/preferences': t('app.pageTitle.preferences'),
   };
-  return <>{map[location.pathname] ?? 'ARPA: Meal Planner'}</>;
+  return <>{map[location.pathname] ?? t('app.pageTitle.appName')}</>;
 }
 
 export default function App() {
@@ -122,10 +123,10 @@ export default function App() {
               />
               <div className="flex flex-col leading-none">
                 <span className="font-display text-2xl font-extrabold tracking-tighter text-primary-container dark:text-primary-fixed-dim">
-                  ARPA
+                  {t('app.logo.title')}
                 </span>
                 <span className="mt-1 text-[10px] uppercase tracking-[0.18em] text-outline font-bold">
-                  Meal Planner
+                  {t('app.logo.subtitle')}
                 </span>
               </div>
             </div>
@@ -158,7 +159,7 @@ export default function App() {
               >
                 <span className="flex items-center gap-2">
                   <Users className="w-4 h-4" />
-                  Family Sync
+                  {t('app.nav.familySync')}
                 </span>
                 <span className="text-xs text-outline truncate max-w-24">
                   {currentFamily === 'default' ? 'Personal' : currentFamily}
@@ -178,9 +179,9 @@ export default function App() {
                   A
                 </div>
                 <div className="flex flex-col items-start leading-tight min-w-0">
-                  <span className="font-display font-semibold truncate">Chef</span>
+                  <span className="font-display font-semibold truncate">{t('app.nav.chef.title')}</span>
                   <span className="text-[11px] text-outline truncate">
-                    Profile &amp; settings
+                    {t('app.nav.chef.subtitle')}
                   </span>
                 </div>
               </NavLink>
@@ -196,7 +197,7 @@ export default function App() {
                   <Search className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-outline" />
                   <input
                     type="text"
-                    placeholder="Search recipes, ingredients..."
+                    placeholder={t('app.placeholders.search')}
                     className="w-full pl-12 pr-4 py-2.5 bg-surface-container-low border border-transparent focus:border-primary/30 rounded-full text-sm focus:outline-none focus:ring-2 focus:ring-primary/15 text-on-surface placeholder:text-outline"
                   />
                 </div>
@@ -205,7 +206,7 @@ export default function App() {
                 <button
                   type="button"
                   className="p-2.5 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                  aria-label="Notifications"
+                  aria-label={t('app.buttons.notifications')}
                 >
                   <Bell className="w-5 h-5" />
                 </button>
@@ -214,7 +215,7 @@ export default function App() {
                     type="button"
                     onClick={handleQuickTheme}
                     className="p-2.5 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                    aria-label={themeIconDark ? 'Switch to light theme' : 'Switch to dark theme'}
+                    aria-label={themeIconDark ? t('app.buttons.theme.light') : t('app.buttons.theme.dark')}
                   >
                     {themeIconDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                   </button>
@@ -240,7 +241,7 @@ export default function App() {
                     }}
                   />
                   <div className="flex flex-col leading-none">
-                    <span className="font-display text-lg font-extrabold tracking-tighter">ARPA</span>
+                    <span className="font-display text-lg font-extrabold tracking-tighter">{t('app.logo.title')}</span>
                     <span className="text-[9px] uppercase tracking-widest text-outline font-bold mt-0.5">
                       <PageTitle />
                     </span>
@@ -250,7 +251,7 @@ export default function App() {
                   <button
                     onClick={() => setIsFamilyModalOpen(true)}
                     className="p-2 rounded-full text-on-surface-variant hover:bg-surface-container-high"
-                    aria-label="Family sync"
+                    aria-label={t('app.nav.familySync')}
                   >
                     <Users className="w-5 h-5" />
                   </button>
@@ -259,7 +260,7 @@ export default function App() {
                       type="button"
                       onClick={handleQuickTheme}
                       className="p-2.5 rounded-full text-on-surface-variant hover:bg-surface-container-high transition-colors"
-                      aria-label={themeIconDark ? 'Switch to light theme' : 'Switch to dark theme'}
+                      aria-label={themeIconDark ? t('app.buttons.theme.light') : t('app.buttons.theme.dark')}
                     >
                       {themeIconDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
                     </button>
@@ -294,7 +295,7 @@ export default function App() {
                   }
                 >
                   <LayoutDashboard className="w-5 h-5" />
-                  Home
+                  {t('app.mobileNav.home')}
                 </NavLink>
                 <NavLink
                   to="/planner"
@@ -307,7 +308,7 @@ export default function App() {
                   }
                 >
                   <Calendar className="w-5 h-5" />
-                  Planner
+                  {t('app.mobileNav.planner')}
                 </NavLink>
                 <NavLink
                   to="/grocery"
@@ -320,7 +321,7 @@ export default function App() {
                   }
                 >
                   <ShoppingBasket className="w-5 h-5" />
-                  Grocery
+                  {t('app.mobileNav.grocery')}
                 </NavLink>
                 <NavLink
                   to="/pantry"
@@ -333,7 +334,7 @@ export default function App() {
                   }
                 >
                   <Boxes className="w-5 h-5" />
-                  Pantry
+                  {t('app.mobileNav.pantry')}
                 </NavLink>
                 <NavLink
                   to="/preferences"
@@ -346,7 +347,7 @@ export default function App() {
                   }
                 >
                   <SettingsIcon className="w-5 h-5" />
-                  Settings
+                  {t('app.mobileNav.settings')}
                 </NavLink>
               </div>
             </nav>
@@ -371,7 +372,7 @@ export default function App() {
                     <Sparkles className="w-5 h-5" />
                   </div>
                   <h2 className="text-2xl font-display font-extrabold tracking-tight text-on-surface">
-                    Family Sync
+                    {t('familySyncModal.title')}
                   </h2>
                 </div>
                 <button
@@ -383,19 +384,19 @@ export default function App() {
                 </button>
               </div>
               <p className="text-on-surface-variant mb-6 text-sm">
-                Enter a shared family code to sync meals, planner, and grocery lists across devices. Leave blank for personal use.
+                {t('familySyncModal.text')}
               </p>
 
               <div className="space-y-4">
                 <div>
                   <label className="block text-xs font-display font-bold uppercase tracking-widest text-outline mb-2">
-                    Family Code
+                    {t('familySyncModal.fields.code.label')}
                   </label>
                   <input
                     type="text"
                     value={familyCode === 'default' ? '' : familyCode}
                     onChange={(e) => setFamilyCode(e.target.value)}
-                    placeholder="e.g. smith-family-2024"
+                    placeholder={t('familySyncModal.fields.code.placeholder')}
                     className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/40 rounded-2xl focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 text-on-surface placeholder:text-outline"
                   />
                 </div>
@@ -405,13 +406,13 @@ export default function App() {
                     onClick={() => setIsFamilyModalOpen(false)}
                     className="flex-1 px-4 py-3 border border-outline-variant/50 text-on-surface dark:text-on-surface-variant rounded-full font-display font-semibold text-sm hover:bg-surface-container-low dark:hover:bg-surface-container-high transition-colors"
                   >
-                    Cancel
+                    {t('familySyncModal.buttons.cancel')}
                   </button>
                   <button
                     onClick={handleSaveFamily}
                     className="flex-1 px-4 py-3 bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-full font-display font-semibold text-sm transition-opacity hover:opacity-90"
                   >
-                    Save & Sync
+                    {t('familySyncModal.buttons.save')}
                   </button>
                 </div>
               </div>
