@@ -5,7 +5,6 @@ import {
   type ResponseLanguageCode,
 } from '@/ai/response-languages';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface ResponseLanguageSelectorProps {
   value: ResponseLanguageCode;

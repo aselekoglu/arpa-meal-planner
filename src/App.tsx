@@ -28,16 +28,17 @@ import {
   toggleExplicitThemeMode,
   ThemeMode,
 } from './lib/preferences';
-import { t } from 'i18next';
+import { useTranslation } from 'react-i18next';
 
 const NAV_ITEMS = [
-  { to: '/', label: t('app.nav.dashboard'), icon: LayoutDashboard, end: true },
-  { to: '/planner', label: t('app.nav.planner'), icon: Calendar },
-  { to: '/grocery', label: t('app.nav.grocery'), icon: ShoppingBasket },
-  { to: '/pantry', label: t('app.nav.pantry'), icon: Boxes },
-];
+  { to: '/', labelKey: 'app.nav.dashboard', icon: LayoutDashboard, end: true },
+  { to: '/planner', labelKey: 'app.nav.planner', icon: Calendar, end: false },
+  { to: '/grocery', labelKey: 'app.nav.grocery', icon: ShoppingBasket, end: false },
+  { to: '/pantry', labelKey: 'app.nav.pantry', icon: Boxes, end: false },
+] as const;
 
 function PageTitle() {
+  const { t } = useTranslation('translation');
   const location = useLocation();
   const map: Record<string, string> = {
     '/': t('app.pageTitle.dashboard'),
@@ -50,6 +51,7 @@ function PageTitle() {
 }
 
 export default function App() {
+  const { t } = useTranslation('translation');
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => loadThemeMode());
   const [isFamilyModalOpen, setIsFamilyModalOpen] = useState(false);
   const [familyCode, setFamilyCode] = useState('');
@@ -59,6 +61,10 @@ export default function App() {
     migrateLegacyDarkModeToPreferences();
     setThemeMode(loadThemeMode());
   }, []);
+
+  useEffect(() => {
+    document.title = t('app.pageTitle.appName');
+  }, [t]);
 
   useEffect(() => {
     const savedFamily = localStorage.getItem('familyId');
@@ -132,7 +138,7 @@ export default function App() {
             </div>
 
             <nav className="flex flex-col gap-1">
-              {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+              {NAV_ITEMS.map(({ to, labelKey, icon: Icon, end }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -146,7 +152,7 @@ export default function App() {
                   }
                 >
                   <Icon className="w-5 h-5" />
-                  {label}
+                  {t(labelKey)}
                 </NavLink>
               ))}
             </nav>
@@ -162,7 +168,7 @@ export default function App() {
                   {t('app.nav.familySync')}
                 </span>
                 <span className="text-xs text-outline truncate max-w-24">
-                  {currentFamily === 'default' ? 'Personal' : currentFamily}
+                  {currentFamily === 'default' ? t('app.nav.personal') : currentFamily}
                 </span>
               </button>
               <NavLink
@@ -378,7 +384,7 @@ export default function App() {
                 <button
                   onClick={() => setIsFamilyModalOpen(false)}
                   className="p-1 rounded-full text-outline hover:bg-surface-container-high"
-                  aria-label="Close"
+                  aria-label={t('app.buttons.close')}
                 >
                   <X className="w-5 h-5" />
                 </button>

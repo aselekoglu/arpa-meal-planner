@@ -34,14 +34,11 @@ import {
 } from '../lib/ai-job-nav-state';
 import { loadDefaultServings, loadWeekStartsOn } from '../lib/preferences';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
-
-const DAY_LABELS_MON = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-const DAY_LABELS_SUN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+import { dateLocaleFor } from '../lib/date-locale';
 
 export default function Dashboard() {
   const location = useLocation();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [plannerItems, setPlannerItems] = useState<PlannerItem[]>([]);
@@ -131,7 +128,10 @@ export default function Dashboard() {
 
   const weekStartsOn = loadWeekStartsOn();
   const weekStart = startOfWeek(selectedDate, { weekStartsOn });
-  const dayLabels = weekStartsOn === 0 ? DAY_LABELS_SUN : DAY_LABELS_MON;
+  const dateLocale = dateLocaleFor(i18n.resolvedLanguage);
+  const dayLabels = Array.from({ length: 7 }, (_, index) =>
+    format(addDays(weekStart, index), 'EEEE', { locale: dateLocale }),
+  );
   const weekEnd = addDays(weekStart, 6);
   const weekDates = Array.from({ length: 7 }).map((_, i) => format(addDays(weekStart, i), 'yyyy-MM-dd'));
 
@@ -194,7 +194,7 @@ export default function Dashboard() {
   const pantryAlerts = pantryItems.filter((item) => item.amount <= 1).slice(0, 3);
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this meal?')) return;
+    if (!confirm(t('dashboard.confirmDelete'))) return;
     try {
       await apiFetch(`/api/meals/${id}`, { method: 'DELETE' });
       fetchMeals();
@@ -217,7 +217,10 @@ export default function Dashboard() {
             {t('dashboard.pageTitle')}
           </h1>
           <p className="text-on-surface-variant mt-2 font-medium">
-            {t('dashboard.pageSubtitle', {from: format(weekStart, 'MMM d'), to: format(weekEnd, 'MMM d')})}
+            {t('dashboard.pageSubtitle', {
+              from: format(weekStart, 'MMM d', { locale: dateLocale }),
+              to: format(weekEnd, 'MMM d', { locale: dateLocale }),
+            })}
           </p>
         </div>
         <div className="flex flex-wrap gap-3 items-center">
@@ -230,7 +233,8 @@ export default function Dashboard() {
               <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
             </button>
             <div className="px-3 text-sm font-display font-semibold text-on-surface whitespace-nowrap">
-              {format(weekStart, 'MMM d')} - {format(weekEnd, 'MMM d')}
+              {format(weekStart, 'MMM d', { locale: dateLocale })} -{' '}
+              {format(weekEnd, 'MMM d', { locale: dateLocale })}
             </div>
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, 7))}

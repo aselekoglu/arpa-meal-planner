@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "BIND_HOST=0.0.0.0 tsx server.ts",
     "build": "vite build",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",

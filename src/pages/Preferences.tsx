@@ -21,15 +21,10 @@ import {
   saveWeekStartsOn,
   ThemeMode,
 } from '../lib/preferences';
-import { t } from 'i18next';
-
-const MODES = {
-  light: t('preferences.appearance.light'),
-  dark: t('preferences.appearance.dark'),
-  system: t('preferences.appearance.system'),
-};
+import { useTranslation } from 'react-i18next';
 
 export default function Preferences() {
+  const { t, i18n } = useTranslation();
   const [defaultServings, setDefaultServings] = useState(() => loadDefaultServings());
   const [weekStartsOn, setWeekStartsOn] = useState<0 | 1>(() => loadWeekStartsOn());
   const [themeMode, setThemeModeState] = useState<ThemeMode>(() => loadThemeMode());
@@ -45,6 +40,12 @@ export default function Preferences() {
     () => loadAiSettings().responseLanguage ?? 'auto',
   );
   const [servingsSaved, setServingsSaved] = useState(false);
+  const uiLanguage = i18n.resolvedLanguage?.startsWith('tr') ? 'tr' : 'en';
+  const modes = {
+    light: t('preferences.appearance.light'),
+    dark: t('preferences.appearance.dark'),
+    system: t('preferences.appearance.system'),
+  };
 
   useEffect(() => {
     const syncAi = () => {
@@ -132,6 +133,30 @@ export default function Preferences() {
       </div>
 
       <section className="bg-surface-container-lowest rounded-[2rem] border border-outline-variant/15 p-6 lg:p-8 space-y-4">
+        <h2 className="text-lg font-display font-bold text-on-surface">
+          {t('preferences.interfaceLanguage.title')}
+        </h2>
+        <p className="text-sm text-on-surface-variant">
+          {t('preferences.interfaceLanguage.text')}
+        </p>
+        <label
+          htmlFor="interface-language"
+          className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline"
+        >
+          {t('preferences.interfaceLanguage.label')}
+        </label>
+        <select
+          id="interface-language"
+          value={uiLanguage}
+          onChange={(event) => void i18n.changeLanguage(event.target.value)}
+          className="w-full px-4 py-3 bg-surface-container-low border border-outline-variant/30 rounded-2xl text-on-surface focus:outline-none focus:ring-2 focus:ring-primary/30"
+        >
+          <option value="en">English</option>
+          <option value="tr">Türkçe</option>
+        </select>
+      </section>
+
+      <section className="bg-surface-container-lowest rounded-[2rem] border border-outline-variant/15 p-6 lg:p-8 space-y-4">
         <h2 className="text-lg font-display font-bold text-on-surface">{t('preferences.meals.title')}</h2>
         <p className="text-sm text-on-surface-variant">
           {t('preferences.meals.text')}
@@ -211,7 +236,7 @@ export default function Preferences() {
                   : 'border-outline-variant/40 text-on-surface-variant hover:border-primary-container/40'
               }`}
             >
-              {MODES[mode]}
+              {modes[mode]}
             </button>
           ))}
         </div>

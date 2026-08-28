@@ -89,13 +89,15 @@
       "nutrition": "Failed to estimate nutrition",
       "instructions": "Instructions already exist. Clear them first to fetch replacements.",
       "meal": "Failed to save meal",
-      "fetchInstructions": "Failed to fetch instructions"
+      "fetchInstructions": "Failed to fetch instructions",
+      "noInstructions": "No instructions were returned."
     },
     "nutrition": "Nutrition fields updated from AI estimates.",
     "responseLangMsg": "Using saved response language from Preferences for AI instructions and nutrition.",
     "meal": "Meal",
     "untitledMeal": "Untitled meal",
-    "successInstruction": "Instructions fetched successfully."
+    "successInstruction": "Instructions fetched successfully.",
+    "imagePreview": "Meal image preview"
   },
   "aiJobQueuePanel": {
     "jobs": "AI jobs",
@@ -136,6 +138,7 @@
       "grocery": "Grocery List",
       "pantry": "Pantry",
       "familySync": "Family Sync",
+      "personal": "Personal",
       "chef": {
         "title": "Chef",
         "subtitle": "Profile & settings"
@@ -166,7 +169,8 @@
       },
       "notifications": "Notifications",
       "nextWeek": "Next week",
-      "previousWeek": "Previous week"
+      "previousWeek": "Previous week",
+      "close": "Close"
     }
   },
   "chatbot": {
@@ -178,11 +182,17 @@
         "placeholder": "Ask about recipes, ingredients..."
       }
     },
-    "thinking": "Thinking…"
+    "thinking": "Thinking…",
+    "errors": {
+      "request": "Chat request failed",
+      "unknown": "Unknown error",
+      "response": "Error: {{message}}"
+    }
   },
   "dashboard": {
     "pageTitle": "Welcome back, Gourmet.",
     "pageSubtitle": "Nutrition and meals for {{from}} - {{to}}.",
+    "confirmDelete": "Are you sure you want to delete this meal?",
     "buttons": {
       "currentWeek": "Current Week",
       "importRecipe": "Import Recipe",
@@ -271,6 +281,11 @@
     "AItext": "Using saved AI provider from Preferences.",
     "langText": "Using saved response language from Preferences.",
     "dietary": "Dietary Preference",
+    "jobTitle": "Generate weekly plan",
+    "errors": {
+      "generate": "Failed to generate meal plan",
+      "default": "An error occurred while generating the meal plan."
+    },
     "buttons": {
       "cancel": "Cancel",
       "loading": "Generating...",
@@ -296,6 +311,30 @@
       "link": "Adjust Pantry"
     },
     "title2": "Grocery List",
+    "measure": {
+      "unit_one": "Unit",
+      "unit_other": "Units"
+    },
+    "categories": {
+      "dairyCold": "Dairy & Cold",
+      "freshProduce": "Fresh Produce",
+      "meatSeafood": "Meat & Seafood",
+      "bakery": "Bakery",
+      "pantry": "Pantry",
+      "frozen": "Frozen"
+    },
+    "pdf": {
+      "title": "Grocery List",
+      "week": "For week of {{from}} - {{to}}",
+      "yes": "Yes",
+      "no": "No",
+      "headers": {
+        "done": "Got it?",
+        "item": "Item",
+        "amount": "Amount"
+      },
+      "filename": "Grocery-List"
+    },
     "empty": {
       "title": "Your list is empty",
       "subtitle": "Add meals to your weekly planner to generate a grocery list."
@@ -310,6 +349,8 @@
     "mergePopup": {
       "title": "Merge Similar Names",
       "empty": "No close matches found in this week's grocery names.",
+      "suggestedGroup": "Suggested Group",
+      "selectAll": "Select All",
       "fields": {
         "addItem": {
           "label": "Add items manually",
@@ -321,6 +362,14 @@
         }
       },
       "noMatches": "No additional matches.",
+      "confirm": "Merge {{count}} names into \"{{target}}\"? This updates meal ingredients and pantry names.",
+      "success": "Merged {{count}} names into \"{{target}}\".",
+      "errors": {
+        "selectTwo": "Select at least 2 names to merge.",
+        "selectTarget": "Select a valid target name from the selected items.",
+        "endpoint": "Merge endpoint is unavailable (404). Restart the dev server so the latest backend routes load.",
+        "default": "Failed to merge names"
+      },
       "buttons": {
         "close": "Close",
         "apply": "Apply Merge",
@@ -330,6 +379,13 @@
     "smartGroupPopup": {
       "AItext": "Using saved AI provider from Preferences.",
       "langText": "Using saved response language from Preferences.",
+      "jobTitle": "Smart-group groceries",
+      "itemCount": "Grocery list ({{count}} items)",
+      "errors": {
+        "request": "Grouping request failed",
+        "rateLimit": "Bebü Bot is a bit busy right now (rate limit reached). I've applied some basic grouping for you!",
+        "fallback": "Something went wrong while grouping. I've tried my best to categorize common items."
+      },
       "buttons": {
         "close": "Close",
         "run": "Run Grouping"
@@ -358,7 +414,8 @@
     "googleText": "Meal images always use Google. Model follows your Gemini settings when applicable; otherwise the Google default applies.",
     "errors": {
       "onlyGoogle": "Image generation currently supports only the Google provider.",
-      "default": "An error occurred"
+      "default": "An error occurred",
+      "noImage": "No image was returned"
     }
   },
   "importRecipeModal": {
@@ -401,6 +458,12 @@
     "base": "base",
     "edit": "Edit Meal",
     "viewOriginal": "View Original Recipe",
+    "nutrients": {
+      "calories": "Cal",
+      "protein": "Pro",
+      "fat": "Fat",
+      "carbs": "Carb"
+    },
     "ingredientsList": {
       "title": "Ingredients"
     },
@@ -466,6 +529,9 @@
     "today": "Today",
     "select": "Select a meal…",
     "servings": "servings",
+    "dropHere": "Drop meal here",
+    "moveAria": "Move {{name}} to another day",
+    "mealOptionServings": "{{count}} servings",
     "discovery": {
       "title": "Recipe Discovery",
       "subtitle": "Drag recipes onto your calendar",
@@ -473,7 +539,8 @@
         "placeholder": "Find inspiration…"
       },
       "empty": "No recipes match your search. Try clearing filters.",
-      "all": "All"
+      "all": "All",
+      "count": "{{ingredients}} ingredients / {{servings}} servings"
     },
     "errors": {
       "move": "Failed to move meal",
@@ -483,6 +550,11 @@
   "preferences": {
     "title": "Preferences",
     "subtitle": "Defaults for new recipes, calendar layout, appearance, and AI behavior.",
+    "interfaceLanguage": {
+      "title": "Interface Language",
+      "text": "Choose the language used throughout ARPA. Your choice is saved in this browser.",
+      "label": "Language"
+    },
     "meals": {
       "title": "Meals",
       "text": "Applies when you add a new recipe or import without an explicit servings value.",
@@ -540,7 +612,7 @@
         }
       },
       "langHelper": "Auto infers language from your inputs when possible; otherwise uses your browser locale as a hint.",
-      "imageText": "Image generation always uses Google&apos;s image model. If your saved chat provider is Ollama or MLX, meal images still run on Google automatically."
+      "imageText": "Image generation always uses Google's image model. If your saved chat provider is Ollama or MLX, meal images still run on Google automatically."
     }
   },
   "responseLanguageSelector": {

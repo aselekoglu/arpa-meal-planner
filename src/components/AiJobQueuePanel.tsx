@@ -2,7 +2,6 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Sparkles, X } from 'lucide-react';
 import { formatAiServiceLine, useAiJobQueue } from '../context/AiJobQueueContext';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 export default function AiJobQueuePanel() {
   const { t } = useTranslation();
@@ -54,7 +53,9 @@ export default function AiJobQueuePanel() {
         <div className="flex items-center justify-between gap-2 border-b border-outline-variant/30 px-4 py-3 dark:border-outline-variant/40">
           <div className="flex items-center gap-2 min-w-0">
             <Sparkles className="h-4 w-4 shrink-0 text-primary-container dark:text-primary-fixed-dim" />
-            <span className="truncate font-display text-sm font-bold text-on-surface">AI jobs</span>
+            <span className="truncate font-display text-sm font-bold text-on-surface">
+              {t('aiJobQueuePanel.jobs')}
+            </span>
             {runningCount > 0 ? (
               <span className="shrink-0 rounded-full bg-primary-container/15 px-2 py-0.5 text-[10px] font-bold text-primary-container dark:bg-primary-fixed-dim/20 dark:text-primary-fixed-dim">
                 {runningCount} {t('aiJobQueuePanel.running')}

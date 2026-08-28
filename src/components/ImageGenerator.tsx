@@ -12,7 +12,6 @@ import {
 } from '../lib/ai-settings';
 import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface ImageGeneratorProps {
   meal: Meal;
@@ -62,7 +61,7 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
       await runWithAiJob(
         {
           kind: 'generate-meal-image',
-          title: 'Generate meal image',
+          title: t('imageGenerator.title'),
           relatedLabel: meal.name,
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
@@ -90,10 +89,10 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
           });
           const data = await res.json().catch(() => ({}));
           if (!res.ok) {
-            throw new Error(data.error || 'Image generation failed');
+            throw new Error(data.error || t('imageGenerator.errors.default'));
           }
           if (!data.imageUrl) {
-            throw new Error('No image returned');
+            throw new Error(t('imageGenerator.errors.noImage'));
           }
           const imageUrl = data.imageUrl as string;
           if (mountedRef.current) {

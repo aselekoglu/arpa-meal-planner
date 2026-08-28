@@ -18,10 +18,10 @@ import { getMealBaseServings, resolveEffectiveServings } from '../lib/meal-scali
 import { isAiJobNavigationState, type AiJobNavigationState } from '../lib/ai-job-nav-state';
 import { loadWeekStartsOn } from '../lib/preferences';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
+import { dateLocaleFor } from '../lib/date-locale';
 
 export default function Planner() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const [meals, setMeals] = useState<Meal[]>([]);
@@ -77,6 +77,7 @@ export default function Planner() {
   const weekStartsOn = loadWeekStartsOn();
   const startDate = startOfWeek(selectedDate, { weekStartsOn });
   const weekDays = Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
+  const dateLocale = dateLocaleFor(i18n.resolvedLanguage);
 
   const tags = Array.from(new Set(meals.map((m) => m.tag).filter(Boolean)));
 
@@ -237,7 +238,8 @@ export default function Planner() {
               <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
             </button>
             <div className="px-3 text-sm font-display font-semibold text-on-surface whitespace-nowrap">
-              {format(startDate, 'MMM d')} – {format(addDays(startDate, 6), 'MMM d')}
+              {format(startDate, 'MMM d', { locale: dateLocale })} –{' '}
+              {format(addDays(startDate, 6), 'MMM d', { locale: dateLocale })}
             </div>
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, 7))}
@@ -294,7 +296,7 @@ export default function Planner() {
                       isToday ? 'text-primary-container dark:text-primary-fixed-dim' : 'text-outline'
                     }`}
                   >
-                    {format(day, 'EEE')}
+                    {format(day, 'EEE', { locale: dateLocale })}
                   </p>
                   <p
                     className={`font-display text-xl font-extrabold ${
@@ -307,7 +309,7 @@ export default function Planner() {
                   </p>
                   {activeDropDate === dateStr && (
                     <span className="mt-1 inline-flex rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-on-primary">
-                      Drop meal here
+                      {t('planner.dropHere')}
                     </span>
                   )}
                 </div>
@@ -322,7 +324,7 @@ export default function Planner() {
                       className={`aspect-[4/5] rounded-[1.5rem] overflow-hidden relative group/card shadow-sm hover:shadow-md transition-all bg-surface-container cursor-grab active:cursor-grabbing select-none ${
                         draggingPlannerId === planner.id ? 'opacity-50 scale-[0.98]' : ''
                       }`}
-                      aria-label={`Move ${planner.meal_name} to another day`}
+                      aria-label={t('planner.moveAria', { name: planner.meal_name })}
                     >
                       {meal?.image_url ? (
                         <img
@@ -421,7 +423,7 @@ export default function Planner() {
                       <option value="">{t('planner.select')}</option>
                       {meals.map((meal) => (
                         <option key={meal.id} value={meal.id}>
-                          {meal.name} ({getMealBaseServings(meal)} servings)
+                          {meal.name} ({t('planner.mealOptionServings', { count: getMealBaseServings(meal) })})
                         </option>
                       ))}
                     </select>
@@ -521,7 +523,10 @@ export default function Planner() {
                       )}
                       <span className="text-outline text-[9px] font-medium flex items-center gap-1">
                         <Clock className="w-3 h-3" />
-                        {meal.ingredients.length} / {getMealBaseServings(meal)} servings
+                        {t('planner.discovery.count', {
+                          ingredients: meal.ingredients.length,
+                          servings: getMealBaseServings(meal),
+                        })}
                       </span>
                     </div>
                   </div>

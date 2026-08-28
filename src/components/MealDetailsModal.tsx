@@ -21,7 +21,6 @@ import {
   resolveEffectiveServings,
 } from '../lib/meal-scaling';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface MealDetailsModalProps {
   isOpen: boolean;
@@ -106,7 +105,7 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                     <button
                       onClick={() => setDisplayServings((prev) => Math.max(1, prev - 1))}
                       className="w-6 h-6 rounded-full bg-surface-container-low dark:bg-surface-container-highest text-on-surface text-sm font-bold hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors"
-                      aria-label="Decrease servings"
+                      aria-label={t('planner.buttons.decrease')}
                     >
                       -
                     </button>
@@ -116,7 +115,7 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                     <button
                       onClick={() => setDisplayServings((prev) => Math.min(100, prev + 1))}
                       className="w-6 h-6 rounded-full bg-surface-container-low dark:bg-surface-container-highest text-on-surface text-sm font-bold hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors"
-                      aria-label="Increase servings"
+                      aria-label={t('planner.buttons.increase')}
                     >
                       +
                     </button>
@@ -164,10 +163,10 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
 
             {(totalCalories > 0 || totalProtein > 0) && (
               <div className="grid grid-cols-4 gap-2 bg-surface-container-low dark:bg-surface-container-high/60 p-3 rounded-2xl text-center">
-                <NutrientStat label="Cal" value={Math.round(totalCalories)} />
-                <NutrientStat label="Pro" value={`${totalProtein.toFixed(0)}g`} />
-                <NutrientStat label="Fat" value={`${totalFat.toFixed(0)}g`} />
-                <NutrientStat label="Carb" value={`${totalCarbs.toFixed(0)}g`} />
+                <NutrientStat label={t('mealDetailsModal.nutrients.calories')} value={Math.round(totalCalories)} />
+                <NutrientStat label={t('mealDetailsModal.nutrients.protein')} value={`${totalProtein.toFixed(0)}g`} />
+                <NutrientStat label={t('mealDetailsModal.nutrients.fat')} value={`${totalFat.toFixed(0)}g`} />
+                <NutrientStat label={t('mealDetailsModal.nutrients.carbs')} value={`${totalCarbs.toFixed(0)}g`} />
               </div>
             )}
           </div>

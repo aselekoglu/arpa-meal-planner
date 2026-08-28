@@ -45,7 +45,7 @@ import {
 import { getScaledIngredients, resolveEffectiveServings } from '../lib/meal-scaling';
 import { loadWeekStartsOn } from '../lib/preferences';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
+import { dateLocaleFor } from '../lib/date-locale';
 
 interface GroceryItem {
   name: string;
@@ -181,13 +181,13 @@ function isVagueUnit(unit: string): boolean {
   return token === 'be' || token === 'bebu' || token === 'bebu (be)' || token === 'pinch' || token === 'pinches';
 }
 
-function formatMeasureLabel(amount: number, measure: string): string {
+function formatMeasureLabel(measure: string, unitLabel: string): string {
   if (measure !== 'Unit') return measure;
-  return Math.abs(amount) === 1 ? 'Unit' : 'Units';
+  return unitLabel;
 }
 
 export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const [meals, setMeals] = useState<Meal[]>([]);
   const [plannerItems, setPlannerItems] = useState<PlannerItem[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
@@ -273,6 +273,15 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
   const weekStartsOn = loadWeekStartsOn();
   const startDate = startOfWeek(selectedDate, { weekStartsOn });
   const endDate = addDays(startDate, 6);
+  const dateLocale = dateLocaleFor(i18n.resolvedLanguage);
+  const fallbackCategoryLabels: Record<string, string> = {
+    'Dairy & Cold': t('grocery.categories.dairyCold'),
+    'Fresh Produce': t('grocery.categories.freshProduce'),
+    'Meat & Seafood': t('grocery.categories.meatSeafood'),
+    Bakery: t('grocery.categories.bakery'),
+    Pantry: t('grocery.categories.pantry'),
+    Frozen: t('grocery.categories.frozen'),
+  };
 
   const weekDates = Array.from({ length: 7 }).map((_, i) =>
     format(addDays(startDate, i), 'yyyy-MM-dd'),
@@ -493,16 +502,19 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
     setMergeFeedback(null);
 
     if (selectedMergeNames.length < 2) {
-      setMergeError('Select at least 2 names to merge.');
+      setMergeError(t('grocery.mergePopup.errors.selectTwo'));
       return;
     }
     if (!mergeTargetName || !selectedMergeNames.includes(mergeTargetName)) {
-      setMergeError('Select a valid target name from the selected items.');
+      setMergeError(t('grocery.mergePopup.errors.selectTarget'));
       return;
     }
 
     const shouldMerge = confirm(
-      `Merge ${selectedMergeNames.length} names into "${mergeTargetName}"? This updates meal ingredients and pantry names.`,
+      t('grocery.mergePopup.confirm', {
+        count: selectedMergeNames.length,
+        target: mergeTargetName,
+      }),
     );
     if (!shouldMerge) return;
 
@@ -520,20 +532,25 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
       if (!res.ok) {
         if (res.status === 404) {
           throw new Error(
-            'Merge endpoint is unavailable (404). Restart the dev server so the latest backend routes load.',
+            t('grocery.mergePopup.errors.endpoint'),
           );
         }
-        throw new Error((data as { error?: string }).error || 'Failed to merge names');
+        throw new Error((data as { error?: string }).error || t('grocery.mergePopup.errors.default'));
       }
 
       await Promise.all([fetchMeals(), fetchPlanner(), fetchPantry()]);
 
-      setMergeFeedback(`Merged ${selectedMergeNames.length} names into "${mergeTargetName}".`);
+      setMergeFeedback(
+        t('grocery.mergePopup.success', {
+          count: selectedMergeNames.length,
+          target: mergeTargetName,
+        }),
+      );
       setSelectedMergeNames([]);
       setMergeTargetName('');
       setShowMergePopup(false);
     } catch (error) {
-      setMergeError(error instanceof Error ? error.message : 'Failed to merge names');
+      setMergeError(error instanceof Error ? error.message : t('grocery.mergePopup.errors.default'));
     } finally {
       setIsMerging(false);
     }
@@ -583,11 +600,9 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
       await runWithAiJob(
         {
           kind: 'grocery-group',
-          title: 'Smart-group groceries',
+          title: t('grocery.smartGroupPopup.jobTitle'),
           relatedLabel:
-            itemsToGroup.length === 1
-              ? 'Grocery list (1 item)'
-              : `Grocery list (${itemsToGroup.length} items)`,
+            t('grocery.smartGroupPopup.itemCount', { count: itemsToGroup.length }),
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
           languageLabel: aiJobLanguageLabel(responseLanguage),
@@ -614,7 +629,7 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
             setCategories((prev) => ({ ...prev, ...patch }));
             return merged;
           }
-          throw new Error(data.error || 'Grouping request failed');
+          throw new Error(data.error || t('grocery.smartGroupPopup.errors.request'));
         },
       );
     } catch (error: unknown) {
@@ -681,11 +696,9 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
         errObj?.status === 'RESOURCE_EXHAUSTED' ||
         errObj?.error?.status === 'RESOURCE_EXHAUSTED'
       ) {
-        alert(
-          "Bebü Bot is a bit busy right now (rate limit reached). I've applied some basic grouping for you!",
-        );
+        alert(t('grocery.smartGroupPopup.errors.rateLimit'));
       } else {
-        alert("Something went wrong while grouping. I've tried my best to categorize common items.");
+        alert(t('grocery.smartGroupPopup.errors.fallback'));
       }
     } finally {
       setIsGrouping(false);
@@ -726,34 +739,41 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
 
   const exportToPDF = () => {
     const doc = new jsPDF();
+    const pdfDatePattern = i18n.resolvedLanguage?.startsWith('tr') ? 'dd.MM.yyyy' : 'MMM d, yyyy';
 
     doc.setFontSize(20);
-    doc.text('Grocery List', 14, 22);
+    doc.text(t('grocery.pdf.title'), 14, 22);
 
     doc.setFontSize(12);
     doc.setTextColor(100);
     doc.text(
-      `For week of ${format(startDate, 'MMM d')} - ${format(endDate, 'MMM d, yyyy')}`,
+      t('grocery.pdf.week', {
+        from: format(startDate, pdfDatePattern, { locale: dateLocale }),
+        to: format(endDate, pdfDatePattern, { locale: dateLocale }),
+      }),
       14,
       30,
     );
 
     const tableData = sortedItems.map(([, item]) => [
-      item.checked ? 'Yes' : 'No',
+      item.checked ? t('grocery.pdf.yes') : t('grocery.pdf.no'),
       item.name,
-      `${formatAmountLabel(item.amount)} ${formatMeasureLabel(item.amount, item.measure)}`,
+      `${formatAmountLabel(item.amount)} ${formatMeasureLabel(
+        item.measure,
+        t('grocery.measure.unit', { count: item.amount }),
+      )}`,
     ]);
 
     autoTable(doc, {
       startY: 40,
-      head: [['Got it?', 'Item', 'Amount']],
+      head: [[t('grocery.pdf.headers.done'), t('grocery.pdf.headers.item'), t('grocery.pdf.headers.amount')]],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [6, 95, 70] },
       alternateRowStyles: { fillColor: [248, 243, 236] },
     });
 
-    doc.save(`Grocery-List-${format(startDate, 'yyyy-MM-dd')}.pdf`);
+    doc.save(`${t('grocery.pdf.filename')}-${format(startDate, 'yyyy-MM-dd')}.pdf`);
   };
 
   return (
@@ -779,7 +799,8 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
             <ChevronLeft className="w-4 h-4 text-on-surface-variant" />
           </button>
           <div className="px-3 text-sm font-display font-semibold text-on-surface whitespace-nowrap">
-            {format(startDate, 'MMM d')} – {format(endDate, 'MMM d')}
+            {format(startDate, 'MMM d', { locale: dateLocale })} –{' '}
+            {format(endDate, 'MMM d', { locale: dateLocale })}
           </div>
           <button
             onClick={() => setSelectedDate(addDays(selectedDate, 7))}
@@ -861,13 +882,13 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="text-[11px] font-display font-bold uppercase tracking-wider text-on-surface-variant">
-                                      Suggested Group
+                                      {t('grocery.mergePopup.suggestedGroup')}
                                     </span>
                                     <button
                                       onClick={() => selectSuggestedGroup(group.names)}
                                       className="text-xs font-display font-semibold text-primary hover:underline"
                                     >
-                                      Select All
+                                      {t('grocery.mergePopup.selectAll')}
                                     </button>
                                   </div>
                                   <div className="space-y-1">
@@ -914,7 +935,7 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
                                 ))
                               ) : (
                                 <p className="text-xs text-on-surface-variant">
-                                  placeholder={t('grocery.mergePopup.noMatches')}
+                                  {t('grocery.mergePopup.noMatches')}
                                 </p>
                               )}
                             </div>
@@ -1022,7 +1043,7 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
                     <div key={category}>
                       {category !== 'Uncategorized' && (
                         <div className="px-6 lg:px-8 py-3 bg-surface-container-low/60 dark:bg-surface-container-high/40 text-[10px] font-display font-bold uppercase tracking-widest text-on-surface-variant">
-                          {category}
+                          {fallbackCategoryLabels[category] ?? category}
                         </div>
                       )}
                       <ul>
@@ -1058,7 +1079,10 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
                               }`}
                             >
                               {formatAmountLabel(item.amount)}{' '}
-                              {formatMeasureLabel(item.amount, item.measure)}
+                              {formatMeasureLabel(
+                                item.measure,
+                                t('grocery.measure.unit', { count: item.amount }),
+                              )}
                             </div>
                           </li>
                         ))}

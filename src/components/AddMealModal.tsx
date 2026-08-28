@@ -28,7 +28,6 @@ import { loadDefaultServings } from '../lib/preferences';
 import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 import { applyNutritionEstimatesToIngredients } from '../lib/ai-job-apply';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface AddMealModalProps {
   isOpen: boolean;
@@ -243,7 +242,7 @@ export default function AddMealModal({
     setIsEstimatingNutrition(true);
     const { provider, model } = loadAiSettings();
     const lang = effectiveResponseLanguage();
-    const mealLabel = (name.trim() || 'Untitled meal').slice(0, 80);
+    const mealLabel = (name.trim() || t('addMealModal.untitledMeal')).slice(0, 80);
     const ingredientSnapshot = ingredients.map((i) => ({ ...i }));
     const nameSnap = name.trim();
     const tagSnap = tag.trim();
@@ -257,7 +256,7 @@ export default function AddMealModal({
       await runWithAiJob(
         {
           kind: 'estimate-nutrition',
-          title: 'Estimate nutrition',
+          title: t('addMealModal.links.estimate'),
           relatedLabel: mealLabel,
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
@@ -346,7 +345,7 @@ export default function AddMealModal({
       await runWithAiJob(
         {
           kind: 'fetch-instructions',
-          title: 'Fetch instructions',
+          title: t('addMealModal.links.fetchInstructions'),
           relatedLabel: mealLabel || t('addMealModal.meal'),
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
@@ -386,7 +385,7 @@ export default function AddMealModal({
                 .filter(Boolean))
             : [];
           if (nextInstructions.length === 0) {
-            throw new Error('No instructions were returned.');
+            throw new Error(t('addMealModal.errors.noInstructions'));
           }
           let resolvedSource = sourceUrlSnap || null;
           if (typeof (data as { sourceUrl?: unknown }).sourceUrl === 'string') {
@@ -543,7 +542,7 @@ export default function AddMealModal({
                   <div className="relative aspect-video rounded-2xl overflow-hidden border border-outline-variant/30 bg-surface-container-low">
                     <img
                       src={imageUrl}
-                      alt="Preview"
+                      alt={t('addMealModal.imagePreview')}
                       className="w-full h-full object-cover"
                       referrerPolicy="no-referrer"
                     />

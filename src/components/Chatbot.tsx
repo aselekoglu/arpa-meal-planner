@@ -11,7 +11,6 @@ import {
   showAiProviderPickerInModals,
 } from '../lib/ai-settings';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface Message {
   role: 'user' | 'model';
@@ -79,12 +78,15 @@ export default function Chatbot() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        throw new Error(data.error || 'Chat request failed');
+        throw new Error(data.error || t('chatbot.errors.request'));
       }
       setMessages((prev) => [...prev, { role: 'model', text: data.text || '' }]);
     } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      setMessages((prev) => [...prev, { role: 'model', text: `Error: ${message}` }]);
+      const message = error instanceof Error ? error.message : t('chatbot.errors.unknown');
+      setMessages((prev) => [
+        ...prev,
+        { role: 'model', text: t('chatbot.errors.response', { message }) },
+      ]);
     } finally {
       setIsLoading(false);
     }

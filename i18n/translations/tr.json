@@ -89,13 +89,15 @@
       "nutrition": "Besin değerleri tahmin edilemedi",
       "instructions": "Talimatlar zaten mevcut. Yenilerini getirmek için önce mevcutları temizleyin.",
       "meal": "Yemek kaydedilemedi",
-      "fetchInstructions": "Talimatlar getirilemedi"
+      "fetchInstructions": "Talimatlar getirilemedi",
+      "noInstructions": "Herhangi bir talimat döndürülmedi."
     },
     "nutrition": "Besin değerleri AI tahminlerine göre güncellendi.",
     "responseLangMsg": "AI talimatları ve besin değerleri için Tercihler'den kaydedilen yanıt dili kullanılıyor.",
     "meal": "Yemek",
     "untitledMeal": "İsimsiz yemek",
-    "successInstruction": "Talimatlar başarıyla getirildi."
+    "successInstruction": "Talimatlar başarıyla getirildi.",
+    "imagePreview": "Yemek görseli önizlemesi"
   },
   "aiJobQueuePanel": {
     "jobs": "AI işleri",
@@ -136,6 +138,7 @@
       "grocery": "Alışveriş Listesi",
       "pantry": "Kiler",
       "familySync": "Aile Senkronizasyonu",
+      "personal": "Kişisel",
       "chef": {
         "title": "Şef",
         "subtitle": "Profil ve ayarlar"
@@ -166,7 +169,8 @@
       },
       "notifications": "Bildirimler",
       "nextWeek": "Gelecek hafta",
-      "previousWeek": "Önceki hafta"
+      "previousWeek": "Önceki hafta",
+      "close": "Kapat"
     }
   },
   "chatbot": {
@@ -178,11 +182,17 @@
         "placeholder": "Tarifler, malzemeler hakkında sor..."
       }
     },
-    "thinking": "Düşünüyor…"
+    "thinking": "Düşünüyor…",
+    "errors": {
+      "request": "Sohbet isteği başarısız oldu",
+      "unknown": "Bilinmeyen hata",
+      "response": "Hata: {{message}}"
+    }
   },
   "dashboard": {
     "pageTitle": "Tekrar hoş geldiniz, Gurme.",
     "pageSubtitle": "{{from}} - {{to}} arası beslenme ve yemekler.",
+    "confirmDelete": "Bu yemeği silmek istediğinizden emin misiniz?",
     "buttons": {
       "currentWeek": "Bu Hafta",
       "importRecipe": "Tarif İçe Aktar",
@@ -271,6 +281,11 @@
     "AItext": "Tercihler'den kaydedilen AI sağlayıcı kullanılıyor.",
     "langText": "Tercihler'den kaydedilen yanıt dili kullanılıyor.",
     "dietary": "Beslenme Tercihi",
+    "jobTitle": "Haftalık plan oluştur",
+    "errors": {
+      "generate": "Yemek planı oluşturulamadı",
+      "default": "Yemek planı oluşturulurken bir hata oluştu."
+    },
     "buttons": {
       "cancel": "İptal",
       "loading": "Oluşturuluyor...",
@@ -296,6 +311,30 @@
       "link": "Kileri Düzenle"
     },
     "title2": "Alışveriş Listesi",
+    "measure": {
+      "unit_one": "Adet",
+      "unit_other": "Adet"
+    },
+    "categories": {
+      "dairyCold": "Süt Ürünleri ve Soğuk Ürünler",
+      "freshProduce": "Taze Meyve ve Sebze",
+      "meatSeafood": "Et ve Deniz Ürünleri",
+      "bakery": "Fırın Ürünleri",
+      "pantry": "Kiler",
+      "frozen": "Dondurulmuş Ürünler"
+    },
+    "pdf": {
+      "title": "Market Listesi",
+      "week": "Hafta: {{from}} - {{to}}",
+      "yes": "Var",
+      "no": "Yok",
+      "headers": {
+        "done": "Tamam?",
+        "item": "Kalem",
+        "amount": "Miktar"
+      },
+      "filename": "Market-Listesi"
+    },
     "empty": {
       "title": "Listeniz boş",
       "subtitle": "Alışveriş listesi oluşturmak için haftalık planlayıcınıza yemek ekleyin."
@@ -310,6 +349,8 @@
     "mergePopup": {
       "title": "Benzer İsimleri Birleştir",
       "empty": "Bu haftanın alışveriş isimlerinde yakın eşleşme bulunamadı.",
+      "suggestedGroup": "Önerilen Grup",
+      "selectAll": "Tümünü Seç",
       "fields": {
         "addItem": {
           "label": "Manuel olarak öğe ekle",
@@ -321,6 +362,14 @@
         }
       },
       "noMatches": "Başka eşleşme yok.",
+      "confirm": "{{count}} ismi \"{{target}}\" altında birleştirilsin mi? Bu işlem yemek malzemelerini ve kiler adlarını günceller.",
+      "success": "{{count}} isim \"{{target}}\" altında birleştirildi.",
+      "errors": {
+        "selectTwo": "Birleştirmek için en az 2 isim seçin.",
+        "selectTarget": "Seçilen öğelerden geçerli bir hedef isim seçin.",
+        "endpoint": "Birleştirme uç noktası kullanılamıyor (404). En güncel backend rotalarını yüklemek için geliştirme sunucusunu yeniden başlatın.",
+        "default": "İsimler birleştirilemedi"
+      },
       "buttons": {
         "close": "Kapat",
         "apply": "Birleştirmeyi Uygula",
@@ -330,6 +379,13 @@
     "smartGroupPopup": {
       "AItext": "Tercihler'den kaydedilen AI sağlayıcı kullanılıyor.",
       "langText": "Tercihler'den kaydedilen yanıt dili kullanılıyor.",
+      "jobTitle": "Alışverişi akıllı grupla",
+      "itemCount": "Alışveriş listesi ({{count}} öğe)",
+      "errors": {
+        "request": "Gruplama isteği başarısız oldu",
+        "rateLimit": "Bebü Bot şu anda biraz meşgul (hız sınırına ulaşıldı). Sizin için temel bir gruplama uyguladım!",
+        "fallback": "Gruplama sırasında bir sorun oluştu. Yaygın öğeleri olabildiğince sınıflandırdım."
+      },
       "buttons": {
         "close": "Kapat",
         "run": "Gruplamayı Çalıştır"
@@ -358,7 +414,8 @@
     "googleText": "Yemek görselleri her zaman Google kullanır. Model, uygulanabilir olduğunda Gemini ayarlarınızı takip eder; aksi halde Google varsayılanı geçerlidir.",
     "errors": {
       "onlyGoogle": "Görsel oluşturma şu anda yalnızca Google sağlayıcısını desteklemektedir.",
-      "default": "Bir hata oluştu"
+      "default": "Bir hata oluştu",
+      "noImage": "Herhangi bir görsel döndürülmedi"
     }
   },
   "importRecipeModal": {
@@ -401,6 +458,12 @@
     "base": "temel",
     "edit": "Yemek Düzenle",
     "viewOriginal": "Orijinal Tarifi Görüntüle",
+    "nutrients": {
+      "calories": "Kal",
+      "protein": "Pro",
+      "fat": "Yağ",
+      "carbs": "Karb"
+    },
     "ingredientsList": {
       "title": "Malzemeler"
     },
@@ -466,6 +529,9 @@
     "today": "Bugün",
     "select": "Bir yemek seç…",
     "servings": "porsiyon",
+    "dropHere": "Yemeği buraya bırak",
+    "moveAria": "{{name}} yemeğini başka bir güne taşı",
+    "mealOptionServings": "{{count}} porsiyon",
     "discovery": {
       "title": "Tarif Keşfi",
       "subtitle": "Tarifleri takviminize sürükleyin",
@@ -473,7 +539,8 @@
         "placeholder": "İlham bul…"
       },
       "empty": "Aramanızla eşleşen tarif yok. Filtreleri temizlemeyi deneyin.",
-      "all": "Tümü"
+      "all": "Tümü",
+      "count": "{{ingredients}} malzeme / {{servings}} porsiyon"
     },
     "errors": {
       "move": "Yemeği taşımayı başaramadı",
@@ -483,6 +550,11 @@
   "preferences": {
     "title": "Tercihler",
     "subtitle": "Yeni tarifler, takvim düzeni, görünüm ve AI davranışı için varsayılanlar.",
+    "interfaceLanguage": {
+      "title": "Arayüz Dili",
+      "text": "ARPA genelinde kullanılacak dili seçin. Seçiminiz bu tarayıcıda kaydedilir.",
+      "label": "Dil"
+    },
     "meals": {
       "title": "Yemekler",
       "text": "Yeni bir tarif eklediğinizde veya açık bir porsiyon değeri olmadan içe aktardığınızda geçerlidir.",

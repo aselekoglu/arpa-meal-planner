@@ -1,6 +1,5 @@
 import { AiProviderId } from '../lib/ai-settings';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface AiProviderSelectorProps {
   provider: AiProviderId;

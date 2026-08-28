@@ -13,7 +13,6 @@ import ImageGenerator from './ImageGenerator';
 import MealDetailsModal from './MealDetailsModal';
 import { getMealBaseServings, getScaledMealNutritionTotals } from '../lib/meal-scaling';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface MealCardProps {
   meal: Meal;

@@ -17,7 +17,6 @@ import {
 } from '../lib/ai-settings';
 import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
 import { useTranslation } from 'react-i18next';
-import '@/i18n/i18n';
 
 interface ImportRecipeModalProps {
   isOpen: boolean;
@@ -78,7 +77,7 @@ export default function ImportRecipeModal({ isOpen, onClose, onSave }: ImportRec
       await runWithAiJob(
         {
           kind: 'import-recipe',
-          title: 'Import recipe',
+          title: t('importRecipeModal.title'),
           relatedLabel: related,
           providerId: provider,
           modelLabel: aiJobModelLabel(provider, model),
