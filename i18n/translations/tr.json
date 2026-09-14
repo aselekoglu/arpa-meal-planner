@@ -260,6 +260,69 @@
       }
     }
   },
+  "receiptHistory": {
+    "title": "Son fişler",
+    "loading": "Fişler yükleniyor…",
+    "empty": "Henüz taranmış fiş yok.",
+    "unknownStore": "Bilinmeyen mağaza",
+    "items_one": "{{count}} ürün",
+    "items_other": "{{count}} ürün"
+  },
+  "receiptScanner": {
+    "button": "Fiş tara",
+    "title": "Fiş tara",
+    "subtitle": "Görsel sağlayıcısını seç; kilere yapılacak her değişikliği içe aktarmadan önce sen onayla.",
+    "close": "Fiş tarayıcıyı kapat",
+    "choose": "Fiş fotoğrafı çek / seç",
+    "preparing": "Görsel hazırlanıyor…",
+    "provider": {
+      "label": "Görsel sağlayıcısı",
+      "gemini": "Google Gemini",
+      "openai": "OpenAI",
+      "tesseract": "Yerel OCR (Tesseract.js)"
+    },
+    "privacyGemini": "Fiş görseli ürünleri çıkarması için Google Gemini'ye gönderilir. Orijinal görsel analizden sonra Arpa tarafından saklanmaz.",
+    "privacyOpenAI": "Fiş görseli ürünleri çıkarması için OpenAI API'ye gönderilir. Arpa stateless işlem ister ve orijinal görseli saklamaz.",
+    "readWith": "Fişi {{provider}} ile oku",
+    "reading": "Fiş okunuyor…",
+    "imported": {
+      "title": "Fiş içe aktarıldı",
+      "summary": "Kilere {{count}} ürün eklendi: {{merged}} mevcut stokla birleştirildi, {{created}} yeni kiler satırı oluşturuldu.",
+      "aliases": "{{count}} fiş kısaltması eşlemesi hatırlandı.",
+      "done": "Tamam"
+    },
+    "review": {
+      "title": "Fişi gözden geçir",
+      "titleMerchant": "Gözden geçir — {{merchant}}",
+      "subtitle": "Emin olunmayan ad veya miktarları düzelt, ürün olmayan satırları yok say ve ardından içe aktar.",
+      "line": "Fiş satırı",
+      "suggestion": "Gemini önerisi: {{name}}",
+      "ignore": "Ürünü yok say",
+      "include": "Ürünü dahil et",
+      "product": "Kiler ürünü",
+      "productPlaceholder": "Bu ne?",
+      "amount": "Miktar",
+      "unit": "Birim",
+      "selectUnit": "Birim seç…",
+      "remember": "“{{raw}}” ifadesini ileride {{name}} olarak hatırla",
+      "thisProduct": "bu ürün",
+      "selected_one": "{{count}} fiş satırı seçildi.",
+      "selected_other": "{{count}} fiş satırı seçildi.",
+      "confirm": "Onayla ve kileri güncelle",
+      "updating": "Kiler güncelleniyor…"
+    },
+    "errors": {
+      "prepare": "Fiş görseli hazırlanamadı",
+      "scan": "Fiş taranamadı",
+      "import": "Fiş içe aktarılamadı",
+      "noLocalItems": "Yerel OCR metin buldu ama ürün satırlarını yeterince güvenle çıkaramadı. AI geliştirmeyi aç veya daha net bir fiş fotoğrafı dene."
+    },
+    "privacyLocal": "Fiş görseli tarayıcından çıkmaz. Tesseract.js, OCR motoru ve İngilizce/Fransızca dil verileri Arpa tarafından sunulur ve yerelde çalışır; hiçbir AI sağlayıcısına görsel veya OCR metni gönderilmez.",
+    "privacyLocalEnhancedCloud": "Fiş görseli tarayıcında kalır. Tesseract.js görseli yerelde okur; ardından temizlenmiş OCR metni yorumlanması için {{provider}} sağlayıcısına gönderilir.",
+    "privacyLocalEnhancedLocal": "Fiş görseli tarayıcında kalır. Tesseract.js görseli yerelde okur ve OCR metni yerel {{provider}} sağlayıcın tarafından yorumlanır.",
+    "readLocal": "Fişi yerelde oku",
+    "localProgress": "Yerel OCR %{{progress}}"
+  },
   "familySyncModal": {
     "title": "Aile Senkronizasyonu",
     "text": "Yemekleri, planlayıcıyı ve alışveriş listelerini cihazlar arasında senkronize etmek için ortak bir aile kodu girin. Kişisel kullanım için boş bırakın.",
@@ -581,6 +644,23 @@
       "dark": "Koyu",
       "system": "Sistem"
     },
+    "receipts": {
+      "title": "Fiş tarama",
+      "text": "Varsayılan fiş motorunu seç. Gemini ve OpenAI görseli bulutta analiz eder; Tesseract.js tamamen tarayıcı içinde çalışabilir.",
+      "providerLabel": "Varsayılan fiş görsel sağlayıcısı",
+      "gemini": "Google Gemini",
+      "openai": "OpenAI",
+      "rememberAliases": "Onaylanan fiş kısaltmalarını hatırla",
+      "rememberAliasesText": "Bir ürünü onayladığında veya düzelttiğinde, aynı mağazanın sonraki fişlerinde bu eşlemeyi tekrar kullan.",
+      "tesseractTitle": "Offline OCR dosyaları dahil",
+      "tesseractText": "Arpa, Tesseract.js 7'yi, WASM runtime'ını ve İngilizce/Fransızca traineddata dosyalarını kendi içinde barındırır; yerel OCR çalışma anında üçüncü taraf CDN'e ihtiyaç duymaz.",
+      "tesseract": "Yerel OCR",
+      "enhancementLabel": "Yerel OCR yorumlama",
+      "enhancementOffTitle": "Yalnızca yerel",
+      "enhancementOffText": "Sadece deterministik ayrıştırma, öğrenilmiş eşlemeler ve malzeme eşleştirmesini kullan. Fiş içeriği hiçbir AI sağlayıcısına gönderilmez.",
+      "enhancementAiTitle": "Mevcut AI sağlayıcısıyla geliştir",
+      "enhancementAiText": "Görseli yerelde tut, sonra temizlenmiş OCR metnini aşağıda ayarlı AI sağlayıcısına gönder. Ollama/MLX ile bu yol da yerelde kalabilir."
+    },
     "ai": {
       "title": "AI",
       "fields": {
@@ -612,7 +692,13 @@
         }
       },
       "langHelper": "Mümkün olduğunda girdilerinizden dili otomatik olarak çıkarır; aksi halde tarayıcı bölgenizi ipucu olarak kullanır.",
-      "imageText": "Görsel oluşturma her zaman Google'ın görsel modelini kullanır. Kaydedilmiş sohbet sağlayıcınız Ollama veya MLX ise, yemek görselleri yine otomatik olarak Google'da çalışır."
+      "imageText": "Görsel oluşturma her zaman Google'ın görsel modelini kullanır. Kaydedilmiş sohbet sağlayıcınız OpenAI, Ollama veya MLX ise, yemek görselleri yine otomatik olarak Google'da çalışır.",
+      "providerStatus": {
+        "title": "Sunucu sağlayıcı durumu",
+        "configured": "Yapılandırıldı",
+        "missing": "API anahtarı eksik",
+        "local": "Yerel uç nokta"
+      }
     }
   },
   "responseLanguageSelector": {

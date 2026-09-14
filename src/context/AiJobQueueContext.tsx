@@ -52,6 +52,7 @@ export type AiJobRunMeta<T> = AiJobCreateMeta & {
 
 function providerDisplayName(id: AiProviderId): string {
   if (id === 'gemini') return 'Google';
+  if (id === 'openai') return 'OpenAI';
   if (id === 'ollama') return 'Ollama';
   return 'MLX';
 }

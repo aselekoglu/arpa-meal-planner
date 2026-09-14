@@ -7,6 +7,11 @@ import db from './db.js';
 import { getMealsWithIngredients } from './meal-queries.js';
 import { registerAiRoutes } from './ai-routes.js';
 import { convertAmount, isApprovedMeasureLabel, normalizeIngredientName } from './src/lib/units.js';
+import { importReceipt, resolveReceiptAnalysis } from './receipt/service.js';
+import {
+  validateReceiptAnalysis,
+  validateReceiptImportRequest,
+} from './receipt/validators.js';
 
 const MAX_NAME_LEN = 500;
 const MAX_TAG_LEN = 200;
@@ -471,6 +476,93 @@ async function startServer() {
       res.json({ success: true });
     } catch {
       res.status(500).json({ error: 'Failed to update servings override' });
+    }
+  });
+
+  app.post('/api/receipts/resolve', (req, res) => {
+    const familyId = parseFamilyId(req);
+    try {
+      const analysis = validateReceiptAnalysis(req.body);
+      return res.json(resolveReceiptAnalysis(familyId, analysis));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to resolve receipt';
+      return res.status(400).json({ error: message });
+    }
+  });
+
+  app.get('/api/receipts', (req, res) => {
+    const familyId = parseFamilyId(req);
+    const receipts = db
+      .prepare(
+        `SELECT
+           r.id,
+           r.merchant,
+           r.purchase_date,
+           r.scanner_engine,
+           r.subtotal,
+           r.tax,
+           r.total,
+           r.currency,
+           r.created_at,
+           COUNT(i.id) AS item_count
+         FROM receipt_scans r
+         LEFT JOIN receipt_scan_items i ON i.receipt_scan_id = r.id
+         WHERE r.family_id = ?
+         GROUP BY r.id
+         ORDER BY r.created_at DESC, r.id DESC
+         LIMIT 100`,
+      )
+      .all(familyId);
+    return res.json(receipts);
+  });
+
+  app.get('/api/receipts/:id', (req, res) => {
+    const familyId = parseFamilyId(req);
+    const id = parseIdParam(req.params.id);
+    if (id === null) {
+      return res.status(400).json({ error: 'Invalid receipt id' });
+    }
+
+    const receipt = db
+      .prepare(
+        `SELECT id, merchant, purchase_date, scanner_engine, raw_text,
+                subtotal, tax, total, currency, created_at
+         FROM receipt_scans
+         WHERE id = ? AND family_id = ?`,
+      )
+      .get(id, familyId) as Record<string, unknown> | undefined;
+
+    if (!receipt) {
+      return res.status(404).json({ error: 'Receipt not found' });
+    }
+
+    const items = db
+      .prepare(
+        `SELECT id, raw_name, canonical_name, amount, measure,
+                unit_price, total_price, match_source, ignored
+         FROM receipt_scan_items
+         WHERE receipt_scan_id = ?
+         ORDER BY id`,
+      )
+      .all(id);
+
+    return res.json({ ...receipt, items });
+  });
+
+  app.post('/api/receipts/import', (req, res) => {
+    const familyId = parseFamilyId(req);
+    try {
+      const payload = validateReceiptImportRequest(req.body);
+      const result = importReceipt(familyId, payload);
+      return res.json(result);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to import receipt';
+      const isValidationError =
+        message.includes('Invalid') ||
+        message.includes('requires') ||
+        message.includes('incomplete') ||
+        message.includes('Unsupported');
+      return res.status(isValidationError ? 400 : 500).json({ error: message });
     }
   });
 

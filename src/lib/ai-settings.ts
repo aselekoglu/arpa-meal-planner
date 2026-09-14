@@ -6,7 +6,7 @@ import {
   type ResponseLanguageCode,
 } from '@/ai/response-languages';
 
-export type AiProviderId = 'gemini' | 'ollama' | 'mlx';
+export type AiProviderId = 'gemini' | 'openai' | 'ollama' | 'mlx';
 
 export type AiProviderUiMode = 'per_request' | 'global_only';
 
@@ -24,6 +24,7 @@ const STORAGE_KEY = 'aiSettings';
 
 const DEFAULT_MODELS: Record<AiProviderId, string> = {
   gemini: 'gemini-3-flash-preview',
+  openai: 'gpt-5.6-luna',
   ollama: '',
   mlx: '',
 };
@@ -50,7 +51,7 @@ export function loadAiSettings(): AiSettings {
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw) as Partial<AiSettings>;
     const provider = parsed.provider;
-    if (provider !== 'gemini' && provider !== 'ollama' && provider !== 'mlx') {
+    if (provider !== 'gemini' && provider !== 'openai' && provider !== 'ollama' && provider !== 'mlx') {
       return DEFAULT_SETTINGS;
     }
     const providerUiMode =

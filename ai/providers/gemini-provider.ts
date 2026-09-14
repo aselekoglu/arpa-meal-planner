@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 import { parseJsonOrThrow } from '../json.js';
-import { AiProvider, AiProviderError, AiTask, AiTaskOptions } from '../types.js';
+import { AiImageInput, AiProvider, AiProviderError, AiTask, AiTaskOptions } from '../types.js';
 
 function getGeminiKey(): string {
   const key = process.env.GEMINI_API_KEY?.trim();
@@ -20,6 +20,7 @@ function defaultGeminiModel(task: AiTask): string {
 export class GeminiProvider implements AiProvider {
   readonly id = 'gemini' as const;
   readonly supportsImage = true;
+  readonly supportsVisionInput = true;
   private readonly client: GoogleGenAI;
 
   constructor() {
@@ -51,6 +52,36 @@ export class GeminiProvider implements AiProvider {
       config: {
         systemInstruction: options.systemInstruction,
         tools: options.useWebSearch ? [{ googleSearch: {} }] : undefined,
+        responseMimeType: 'application/json',
+      },
+    });
+    return parseJsonOrThrow<T>(response.text || '', `${options.task}`);
+  }
+
+  async generateJsonFromImage<T>(
+    prompt: string,
+    image: AiImageInput,
+    options: AiTaskOptions,
+  ): Promise<T> {
+    const model = this.modelFor(options);
+    const response = await this.client.models.generateContent({
+      model,
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            { text: prompt },
+            {
+              inlineData: {
+                mimeType: image.mimeType,
+                data: image.data,
+              },
+            },
+          ],
+        },
+      ],
+      config: {
+        systemInstruction: options.systemInstruction,
         responseMimeType: 'application/json',
       },
     });

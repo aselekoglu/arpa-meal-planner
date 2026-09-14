@@ -1,12 +1,13 @@
 import { GeminiProvider } from './providers/gemini-provider.js';
 import { MlxProvider } from './providers/mlx-provider.js';
 import { OllamaProvider } from './providers/ollama-provider.js';
+import { OpenAIProvider } from './providers/openai-provider.js';
 import { AiProvider, AiProviderError, AiProviderId } from './types.js';
 
 export function parseProviderId(raw: unknown): AiProviderId | undefined {
   if (typeof raw !== 'string') return undefined;
   const value = raw.trim().toLowerCase();
-  if (value === 'gemini' || value === 'ollama' || value === 'mlx') {
+  if (value === 'gemini' || value === 'openai' || value === 'ollama' || value === 'mlx') {
     return value;
   }
   return undefined;
@@ -20,13 +21,15 @@ export function getDefaultProviderId(): AiProviderId {
 export function resolveProvider(rawProvider: unknown): AiProvider {
   const requested = parseProviderId(rawProvider);
   if (rawProvider != null && requested == null) {
-    throw new AiProviderError('Unsupported AI provider. Use gemini, ollama, or mlx.', 400);
+    throw new AiProviderError('Unsupported AI provider. Use gemini, openai, ollama, or mlx.', 400);
   }
 
   const providerId = requested || getDefaultProviderId();
   switch (providerId) {
     case 'gemini':
       return new GeminiProvider();
+    case 'openai':
+      return new OpenAIProvider();
     case 'ollama':
       return new OllamaProvider();
     case 'mlx':

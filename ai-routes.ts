@@ -2,7 +2,7 @@ import type { Express, Request, Response } from 'express';
 import { addDays, format, parseISO } from 'date-fns';
 import db from './db.js';
 import { getMealsWithIngredients } from './meal-queries.js';
-import { resolveProvider } from './ai/provider-resolver.js';
+import { getDefaultProviderId, resolveProvider } from './ai/provider-resolver.js';
 import {
   CHAT_CONTEXT_LANGUAGE_INSTRUCTION,
   buildFetchInstructionsLanguageLead,
@@ -11,6 +11,8 @@ import {
 } from './ai/language-instructions.js';
 import { normalizeLanguageInput } from './ai/response-languages.js';
 import { AiProviderError, AiTaskOptions } from './ai/types.js';
+import { resolveReceiptAnalysis } from './receipt/service.js';
+import { validateReceiptAnalysis } from './receipt/validators.js';
 
 type ImportedRecipe = {
   name?: string;
@@ -96,6 +98,179 @@ function aiError(res: Response, err: unknown, fallback: string) {
 }
 
 export function registerAiRoutes(app: Express) {
+  app.get('/api/ai/provider-status', (_req: Request, res: Response) => {
+    return res.json({
+      defaultProvider: getDefaultProviderId(),
+      providers: {
+        gemini: {
+          configured: Boolean(process.env.GEMINI_API_KEY?.trim()),
+          visionInput: true,
+          webSearch: true,
+        },
+        openai: {
+          configured: Boolean(process.env.OPENAI_API_KEY?.trim()),
+          visionInput: true,
+          webSearch: true,
+        },
+        ollama: {
+          configured: true,
+          visionInput: false,
+          webSearch: false,
+        },
+        mlx: {
+          configured: true,
+          visionInput: false,
+          webSearch: false,
+        },
+      },
+    });
+  });
+
+  app.post('/api/ai/scan-receipt', async (req: Request, res: Response) => {
+    const familyId = String(req.headers['x-family-id'] || 'default').trim() || 'default';
+    const mimeType = typeof req.body?.mimeType === 'string' ? req.body.mimeType.trim() : '';
+    const imageData = typeof req.body?.imageData === 'string' ? req.body.imageData.trim() : '';
+
+    const allowedMimeTypes = new Set([
+      'image/jpeg',
+      'image/png',
+      'image/webp',
+      'image/heic',
+      'image/heif',
+    ]);
+    if (!allowedMimeTypes.has(mimeType)) {
+      return res.status(400).json({ error: 'Unsupported receipt image type' });
+    }
+    if (!imageData || !/^[A-Za-z0-9+/=\s]+$/.test(imageData)) {
+      return res.status(400).json({ error: 'Invalid receipt image data' });
+    }
+
+    const estimatedBytes = Math.floor((imageData.replace(/\s/g, '').length * 3) / 4);
+    if (estimatedBytes > 5 * 1024 * 1024) {
+      return res.status(413).json({ error: 'Receipt image is too large' });
+    }
+
+    try {
+      const provider = resolveProvider(req.body?.provider ?? 'gemini');
+      if (!provider.supportsVisionInput || !provider.generateJsonFromImage) {
+        return res.status(400).json({
+          error: 'The selected AI provider does not support receipt image analysis',
+        });
+      }
+
+      const prompt = `Analyze this grocery receipt and return only JSON.
+
+Extract actual purchased product line items. Ignore subtotal, tax, total, discounts, loyalty points, payment/card information, transaction IDs, cash/change, headers, footers, and other non-product lines.
+For rawText, include only the reconstructed product-line portion needed to understand the purchases. Do not include card numbers, payment identifiers, loyalty/account identifiers, addresses, or transaction IDs.
+
+Preserve each receipt abbreviation exactly in rawName. proposedName should be a concise human-readable grocery/product name. Do not invent quantities, package sizes, units, or prices when they are not reasonably visible.
+
+For pantry-compatible measures, use one of these exact labels when possible:
+Gram (g), Kilogram (kg), Milliliter (ml), Liter (L), Teaspoon (tsp), Tablespoon (Tbsp), Cup (c), Cay Bardagi, Tea Glass, Bebu (be), Unit.
+
+If a product count is visible, use measure "Unit". If a package size is clearly visible, prefer that measurable package size for amount/measure.
+
+Return this shape:
+{
+  "merchant": string | null,
+  "purchaseDate": string | null,
+  "currency": string | null,
+  "rawText": string | null,
+  "items": [
+    {
+      "id": string,
+      "rawName": string,
+      "proposedName": string | null,
+      "quantity": number | null,
+      "amount": number | null,
+      "measure": string | null,
+      "unitPrice": number | null,
+      "totalPrice": number | null,
+      "status": "unresolved"
+    }
+  ],
+  "totals": {
+    "subtotal": number | null,
+    "tax": number | null,
+    "total": number | null
+  }
+}`;
+
+      const raw = await provider.generateJsonFromImage<unknown>(
+        prompt,
+        { mimeType, data: imageData.replace(/\s/g, '') },
+        getTaskOptions(req, 'scan-receipt'),
+      );
+
+      const parsed = validateReceiptAnalysis(raw);
+      return res.json(resolveReceiptAnalysis(familyId, parsed));
+    } catch (err) {
+      return aiError(res, err, 'Receipt scan failed');
+    }
+  });
+
+  app.post('/api/ai/parse-receipt-text', async (req: Request, res: Response) => {
+    const familyId = String(req.headers['x-family-id'] || 'default').trim() || 'default';
+    const rawText = typeof req.body?.rawText === 'string' ? req.body.rawText.trim() : '';
+
+    if (!rawText) {
+      return res.status(400).json({ error: 'rawText is required' });
+    }
+    if (rawText.length > 40_000) {
+      return res.status(413).json({ error: 'Receipt OCR text is too large' });
+    }
+
+    try {
+      const provider = resolveProvider(req.body?.provider);
+      const prompt = `Interpret the following OCR text from a grocery receipt and return only JSON.
+
+Extract actual purchased grocery/product line items. Ignore subtotal, tax, total, discounts, loyalty points, payment/card information, transaction IDs, cash/change, headers, footers, and other non-product lines.
+
+Preserve each original OCR product description in rawName. proposedName should be a concise human-readable grocery/product name. Never invent quantities, package sizes, units, or prices when uncertain.
+
+For pantry-compatible measures, use one of these exact labels when possible:
+Gram (g), Kilogram (kg), Milliliter (ml), Liter (L), Teaspoon (tsp), Tablespoon (Tbsp), Cup (c), Cay Bardagi, Tea Glass, Bebu (be), Unit.
+
+Return this shape:
+{
+  "merchant": string | null,
+  "purchaseDate": string | null,
+  "currency": string | null,
+  "rawText": string | null,
+  "items": [
+    {
+      "id": string,
+      "rawName": string,
+      "proposedName": string | null,
+      "quantity": number | null,
+      "amount": number | null,
+      "measure": string | null,
+      "unitPrice": number | null,
+      "totalPrice": number | null,
+      "status": "unresolved"
+    }
+  ],
+  "totals": {
+    "subtotal": number | null,
+    "tax": number | null,
+    "total": number | null
+  }
+}
+
+OCR text:
+${rawText}`;
+
+      const raw = await provider.generateJson<unknown>(
+        prompt,
+        getTaskOptions(req, 'scan-receipt'),
+      );
+      const parsed = validateReceiptAnalysis(raw);
+      return res.json(resolveReceiptAnalysis(familyId, parsed));
+    } catch (err) {
+      return aiError(res, err, 'Receipt OCR interpretation failed');
+    }
+  });
+
   app.post('/api/ai/chat', async (req: Request, res: Response) => {
     const familyId = String(req.headers['x-family-id'] || 'default').trim() || 'default';
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
@@ -144,7 +319,7 @@ ${CHAT_CONTEXT_LANGUAGE_INSTRUCTION}`,
     try {
       const langParts = resolvedStructuredLanguage(req);
       const provider = resolveProvider(req.body?.provider);
-      const supportsSearch = provider.id === 'gemini';
+      const supportsSearch = provider.id === 'gemini' || provider.id === 'openai';
       const prompt = `Search for a recipe for "${query}". 
       Extract the recipe name, a suitable category/tag (e.g., Italian, Dessert, Breakfast), the list of ingredients, and step-by-step instructions.
       If the query is a URL, extract the information from that specific URL and include it as the source_url.
@@ -282,7 +457,7 @@ ${JSON.stringify(ingredients, null, 2)}${nutritionPromptSuffix}`;
       };
       const fetchLead = buildFetchInstructionsLanguageLead(fetchLangOpts);
       const provider = resolveProvider(req.body?.provider);
-      const supportsSearch = provider.id === 'gemini';
+      const supportsSearch = provider.id === 'gemini' || provider.id === 'openai';
       const prompt = `${fetchLead.userPromptPrefix}Find a step-by-step recipe for "${mealName}".
 ${sourceUrl ? `Prioritize this source URL: ${sourceUrl}.` : 'Use the best available public source.'}
 ${ingredients.length > 0 ? `Use these ingredients as context: ${ingredients.join(', ')}.` : ''}

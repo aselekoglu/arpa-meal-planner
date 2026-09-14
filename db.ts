@@ -53,6 +53,52 @@ db.exec(`
     amount REAL NOT NULL,
     measure TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS receipt_item_aliases (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_id TEXT NOT NULL,
+    store_key TEXT NOT NULL DEFAULT '',
+    raw_key TEXT NOT NULL,
+    canonical_name TEXT NOT NULL,
+    usage_count INTEGER NOT NULL DEFAULT 1,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (family_id, store_key, raw_key)
+  );
+
+  CREATE TABLE IF NOT EXISTS receipt_scans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    family_id TEXT NOT NULL,
+    merchant TEXT,
+    purchase_date TEXT,
+    scanner_engine TEXT NOT NULL,
+    raw_text TEXT,
+    subtotal REAL,
+    tax REAL,
+    total REAL,
+    currency TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS receipt_scan_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    receipt_scan_id INTEGER NOT NULL,
+    raw_name TEXT NOT NULL,
+    canonical_name TEXT,
+    amount REAL,
+    measure TEXT,
+    unit_price REAL,
+    total_price REAL,
+    match_source TEXT,
+    ignored INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (receipt_scan_id) REFERENCES receipt_scans (id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_receipt_scans_family
+    ON receipt_scans (family_id, created_at DESC);
+
+  CREATE INDEX IF NOT EXISTS idx_receipt_alias_lookup
+    ON receipt_item_aliases (family_id, store_key, raw_key);
 `);
 
 try {

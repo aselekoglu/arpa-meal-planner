@@ -23,11 +23,17 @@ export default function AiProviderSelector({
       <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline">
         {t('aiProviderSelector.fields.AiProvider.label')}
       </label>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <ProviderButton
           active={provider === 'gemini'}
           onClick={() => onProviderChange('gemini')}
           label="Google"
+        />
+        <ProviderButton
+          active={provider === 'openai'}
+          onClick={() => onProviderChange('openai')}
+          label="OpenAI"
+          disabled={disableImageProviders}
         />
         <ProviderButton
           active={provider === 'ollama'}

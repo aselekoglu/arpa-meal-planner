@@ -46,6 +46,8 @@ import { getScaledIngredients, resolveEffectiveServings } from '../lib/meal-scal
 import { loadWeekStartsOn } from '../lib/preferences';
 import { useTranslation } from 'react-i18next';
 import { dateLocaleFor } from '../lib/date-locale';
+import ReceiptScannerModal from '../components/receipt/ReceiptScannerModal';
+import ReceiptHistoryCard from '../components/receipt/ReceiptHistoryCard';
 
 interface GroceryItem {
   name: string;
@@ -201,6 +203,8 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
   const [activeTab, setActiveTab] = useState<'list' | 'pantry'>(initialTab);
   const [showSmartGroupPopup, setShowSmartGroupPopup] = useState(false);
   const [showMergePopup, setShowMergePopup] = useState(false);
+  const [showReceiptScanner, setShowReceiptScanner] = useState(false);
+  const [receiptHistoryVersion, setReceiptHistoryVersion] = useState(0);
   const [selectedMergeNames, setSelectedMergeNames] = useState<string[]>([]);
   const [mergeTargetName, setMergeTargetName] = useState('');
   const [manualMergeSearch, setManualMergeSearch] = useState('');
@@ -1181,18 +1185,27 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
           <section className="lg:col-span-2 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-primary-container/10 text-primary-container dark:bg-primary-fixed-dim/10 dark:text-primary-fixed-dim rounded-xl">
-                <Package className="w-5 h-5" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-primary-container/10 text-primary-container dark:bg-primary-fixed-dim/10 dark:text-primary-fixed-dim rounded-xl">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-display font-extrabold tracking-tight text-on-surface">
+                    {t('pantry.title2')}
+                  </h2>
+                  <p className="text-xs text-on-surface-variant">
+                    {t('pantry.subtitle2')}
+                  </p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-display font-extrabold tracking-tight text-on-surface">
-                  {t('pantry.title2')}
-                </h2>
-                <p className="text-xs text-on-surface-variant">
-                  {t('pantry.subtitle2')}
-                </p>
-              </div>
+              <button
+                type="button"
+                onClick={() => setShowReceiptScanner(true)}
+                className="px-5 py-2.5 rounded-full bg-primary text-on-primary font-display font-semibold text-sm hover:opacity-90 active:scale-95 transition-all"
+              >
+                {t('receiptScanner.button')}
+              </button>
             </div>
 
             <div className="bg-surface-container-lowest rounded-[2rem] overflow-hidden border border-outline-variant/15">
@@ -1247,6 +1260,7 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
           </section>
 
           <aside className="space-y-6">
+            <ReceiptHistoryCard refreshToken={receiptHistoryVersion} />
             <div className="bg-surface-container-low rounded-[2rem] p-6 lg:p-7">
               <h3 className="font-display text-lg font-bold text-primary-container dark:text-primary-fixed-dim mb-2">
                 {t('pantry.form.title')}
@@ -1321,6 +1335,16 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
           </aside>
         </div>
       )}
+
+      <ReceiptScannerModal
+        open={showReceiptScanner}
+        onClose={() => setShowReceiptScanner(false)}
+        ingredientSuggestions={ingredientNameSuggestions}
+        onImported={async () => {
+          await fetchPantry();
+          setReceiptHistoryVersion((value) => value + 1);
+        }}
+      />
     </div>
   );
 }

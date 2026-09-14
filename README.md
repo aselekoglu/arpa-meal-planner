@@ -59,13 +59,14 @@ Arpa is a comprehensive, full-stack meal planning application designed to stream
 - **Pantry Deduction:** Smart inventory tracking with unit-aware conversions (grams, milliliters, teaspoons, cups, and more).
 - **Measure Validation:** Strict unit validation ensures accurate calculations for your shopping and cooking.
 - **PDF Export:** Generate clean, printable grocery lists to take with you.
+- **Receipt-to-Pantry Import:** Scan a grocery receipt with Gemini or OpenAI vision, review every extracted item, remember store-specific abbreviations, and transactionally update pantry inventory.
 
 ### 🧹 Ingredient Hygiene
 - **Smart Suggestions:** Auto-suggests existing ingredient names to keep your database consistent.
 - **Merge Tools:** Consolidate similar items with a "Bulk Merge" tool to eliminate duplicate ingredient entries.
 - **Global Updates:** Merging ingredients automatically updates all related meal recipes and pantry inventory.
 
-### 🧠 AI Assistance (Powered by Google Gemini & more)
+### 🧠 AI Assistance (Gemini, OpenAI & local providers)
 - **Nutrition Estimation:** Automatically fill in calories and macros for your recipes.
 - **Instruction Fetching:** Pull step-by-step cooking directions for imported or incomplete recipes.
 - **Aisle Grouping:** Automatically organize your grocery list by supermarket aisle/category.
@@ -93,7 +94,8 @@ Arpa is a comprehensive, full-stack meal planning application designed to stream
 
 3. **Configure Environment:**
    - Copy `.env.example` to `.env`
-   - Add your `GOOGLE_API_KEY` (and any other provider keys you wish to use).
+   - Add `GEMINI_API_KEY` for Google Gemini and/or `OPENAI_API_KEY` for OpenAI.
+   - API keys are read only by the Node/Express server; do not expose them as `VITE_*` variables.
 
 4. **Start Development Server:**
    ```bash
@@ -120,7 +122,7 @@ Arpa is a comprehensive, full-stack meal planning application designed to stream
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS 4, Framer Motion
 - **Backend:** Node.js, Express, tsx
 - **Database:** SQLite (Better-SQLite3)
-- **AI Integration:** Google Gemini, Ollama, and MLX support
+- **AI Integration:** Google Gemini, OpenAI Responses API, Ollama, and MLX support
 
 ---
 

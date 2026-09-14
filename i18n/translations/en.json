@@ -260,6 +260,69 @@
       }
     }
   },
+  "receiptHistory": {
+    "title": "Recent receipts",
+    "loading": "Loading receipts…",
+    "empty": "No receipt scans yet.",
+    "unknownStore": "Unknown store",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items"
+  },
+  "receiptScanner": {
+    "button": "Scan receipt",
+    "title": "Scan receipt",
+    "subtitle": "Choose a vision provider, then approve every pantry change before import.",
+    "close": "Close receipt scanner",
+    "choose": "Choose / take receipt photo",
+    "preparing": "Preparing image…",
+    "provider": {
+      "label": "Vision provider",
+      "gemini": "Google Gemini",
+      "openai": "OpenAI",
+      "tesseract": "Local OCR (Tesseract.js)"
+    },
+    "privacyGemini": "The image is sent to Google Gemini for receipt extraction. The original image is not stored by Arpa after analysis.",
+    "privacyOpenAI": "The image is sent to the OpenAI API for receipt extraction. Arpa requests stateless processing and does not store the original image.",
+    "readWith": "Read receipt with {{provider}}",
+    "reading": "Reading receipt…",
+    "imported": {
+      "title": "Receipt imported",
+      "summary": "Added {{count}} items to pantry: {{merged}} merged with existing stock and {{created}} created as new pantry rows.",
+      "aliases": "Remembered {{count}} receipt abbreviation mappings.",
+      "done": "Done"
+    },
+    "review": {
+      "title": "Review receipt",
+      "titleMerchant": "Review — {{merchant}}",
+      "subtitle": "Fix uncertain names or quantities, ignore non-food lines, then import.",
+      "line": "Receipt line",
+      "suggestion": "AI suggestion: {{name}}",
+      "ignore": "Ignore item",
+      "include": "Include item",
+      "product": "Pantry product",
+      "productPlaceholder": "What is this?",
+      "amount": "Amount",
+      "unit": "Unit",
+      "selectUnit": "Select unit…",
+      "remember": "Remember “{{raw}}” as {{name}} for future receipts",
+      "thisProduct": "this product",
+      "selected_one": "{{count}} line item selected.",
+      "selected_other": "{{count}} line items selected.",
+      "confirm": "Confirm & update pantry",
+      "updating": "Updating pantry…"
+    },
+    "errors": {
+      "prepare": "Failed to prepare receipt image",
+      "scan": "Receipt scan failed",
+      "import": "Receipt import failed",
+      "noLocalItems": "Local OCR found text but could not confidently identify product lines. Enable AI enhancement or try a clearer receipt photo."
+    },
+    "privacyLocal": "The receipt image stays in your browser. Tesseract.js, its OCR engine, and English/French language data are served by Arpa and run locally; no AI provider receives the image or OCR text.",
+    "privacyLocalEnhancedCloud": "The receipt image stays in your browser. Tesseract.js reads it locally; sanitized OCR text is then sent to {{provider}} for interpretation.",
+    "privacyLocalEnhancedLocal": "The receipt image stays in your browser. Tesseract.js reads it locally and the OCR text is interpreted by your local {{provider}} provider.",
+    "readLocal": "Read receipt locally",
+    "localProgress": "Local OCR {{progress}}%"
+  },
   "familySyncModal": {
     "title": "Family Sync",
     "text": "Enter a shared family code to sync meals, planner, and grocery lists across devices. Leave blank for personal use.",
@@ -581,6 +644,23 @@
       "dark": "Dark",
       "system": "System"
     },
+    "receipts": {
+      "title": "Receipt scanning",
+      "text": "Choose the default receipt engine. Gemini and OpenAI analyze the image in the cloud; Tesseract.js can run entirely in the browser.",
+      "providerLabel": "Default receipt vision provider",
+      "gemini": "Google Gemini",
+      "openai": "OpenAI",
+      "rememberAliases": "Remember confirmed receipt abbreviations",
+      "rememberAliasesText": "When you confirm or correct an item, reuse that mapping on future receipts from the same store.",
+      "tesseractTitle": "Offline OCR assets included",
+      "tesseractText": "Arpa vendors Tesseract.js 7, its WASM runtime, and English/French traineddata, so local OCR does not need a third-party CDN at runtime.",
+      "tesseract": "Local OCR",
+      "enhancementLabel": "Local OCR interpretation",
+      "enhancementOffTitle": "Local only",
+      "enhancementOffText": "Use deterministic parsing, learned aliases, and ingredient matching only. No AI provider receives receipt content.",
+      "enhancementAiTitle": "Enhance with current AI provider",
+      "enhancementAiText": "Keep the image local, then send sanitized OCR text to the AI provider configured below. Ollama/MLX can keep this path local too."
+    },
     "ai": {
       "title": "AI",
       "fields": {
@@ -612,7 +692,13 @@
         }
       },
       "langHelper": "Auto infers language from your inputs when possible; otherwise uses your browser locale as a hint.",
-      "imageText": "Image generation always uses Google's image model. If your saved chat provider is Ollama or MLX, meal images still run on Google automatically."
+      "imageText": "Image generation always uses Google's image model. If your saved chat provider is OpenAI, Ollama or MLX, meal images still run on Google automatically.",
+      "providerStatus": {
+        "title": "Server provider status",
+        "configured": "Configured",
+        "missing": "API key missing",
+        "local": "Local endpoint"
+      }
     }
   },
   "responseLanguageSelector": {
