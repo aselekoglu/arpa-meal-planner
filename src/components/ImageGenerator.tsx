@@ -2,15 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { Meal } from '../types';
 import { apiFetch } from '../lib/api';
-import AiProviderSelector from './AiProviderSelector';
-import {
-  AiProviderId,
-  defaultModelForProvider,
-  loadAiSettings,
-  saveAiSettings,
-  showAiProviderPickerInModals,
-} from '../lib/ai-settings';
-import { aiJobModelLabel, useAiJobQueue } from '../context/AiJobQueueContext';
+import { useAiJobQueue } from '../context/AiJobQueueContext';
 import { useTranslation } from 'react-i18next';
 
 interface ImageGeneratorProps {
@@ -32,28 +24,8 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
   const [size, setSize] = useState('1K');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [provider, setProvider] = useState<AiProviderId>('gemini');
-  const [model, setModel] = useState(() => {
-    const s = loadAiSettings();
-    return s.provider === 'gemini' ? s.model : defaultModelForProvider('gemini');
-  });
-
-  useEffect(() => {
-    const sync = () => {
-      const s = loadAiSettings();
-      setProvider('gemini');
-      setModel(s.provider === 'gemini' ? s.model : defaultModelForProvider('gemini'));
-    };
-    sync();
-    window.addEventListener('arpa-ai-settings-updated', sync);
-    return () => window.removeEventListener('arpa-ai-settings-updated', sync);
-  }, []);
 
   const handleGenerate = async () => {
-    if (provider !== 'gemini') {
-      setError(t('imageGenerator.errors.onlyGoogle'));
-      return;
-    }
     setLoading(true);
     setError('');
 
@@ -63,8 +35,8 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
           kind: 'generate-meal-image',
           title: t('imageGenerator.title'),
           relatedLabel: meal.name,
-          providerId: provider,
-          modelLabel: aiJobModelLabel(provider, model),
+          providerId: 'gemini',
+          modelLabel: t('imageGenerator.serverModel'),
           buildRestore: (result: { mealId: number; imageUrl: string }) => ({
             path: '/',
             state: {
@@ -83,8 +55,7 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
             body: JSON.stringify({
               mealId: meal.id,
               size,
-              provider,
-              model: model.trim() || undefined,
+              provider: 'gemini',
             }),
           });
           const data = await res.json().catch(() => ({}));
@@ -106,16 +77,6 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleProviderChange = (next: AiProviderId) => {
-    setProvider(next);
-    if (showAiProviderPickerInModals()) saveAiSettings({ provider: next, model });
-  };
-
-  const handleModelChange = (next: string) => {
-    setModel(next);
-    if (showAiProviderPickerInModals()) saveAiSettings({ provider, model: next });
   };
 
   return (
@@ -152,21 +113,7 @@ export default function ImageGenerator({ meal, onClose, onSuccess }: ImageGenera
             .
           </p>
 
-          {showAiProviderPickerInModals() ? (
-            <div>
-              <AiProviderSelector
-                provider={provider}
-                model={model}
-                onProviderChange={handleProviderChange}
-                onModelChange={handleModelChange}
-                disableImageProviders
-              />
-            </div>
-          ) : (
-            <p className="text-xs text-on-surface-variant">
-              {t('imageGenerator.googleText')}
-            </p>
-          )}
+          <p className="text-xs text-on-surface-variant">{t('imageGenerator.googleText')}</p>
 
           <div>
             <label className="block text-[11px] font-display font-bold uppercase tracking-widest text-outline mb-2">

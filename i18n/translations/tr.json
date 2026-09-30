@@ -411,9 +411,9 @@
       "loading": "Oluşturuluyor...",
       "cancel": "İptal"
     },
-    "googleText": "Yemek görselleri her zaman Google kullanır. Model, uygulanabilir olduğunda Gemini ayarlarınızı takip eder; aksi halde Google varsayılanı geçerlidir.",
+    "googleText": "Yemek görsellerinde, metin modelinizden ayrı olarak sunucuda yapılandırılmış Gemini görsel modeli kullanılır.",
+    "serverModel": "Sunucu görsel modeli",
     "errors": {
-      "onlyGoogle": "Görsel oluşturma şu anda yalnızca Google sağlayıcısını desteklemektedir.",
       "default": "Bir hata oluştu",
       "noImage": "Herhangi bir görsel döndürülmedi"
     }

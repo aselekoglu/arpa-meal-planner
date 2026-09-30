@@ -411,9 +411,9 @@
       "loading": "Generating...",
       "cancel": "Cancel"
     },
-    "googleText": "Meal images always use Google. Model follows your Gemini settings when applicable; otherwise the Google default applies.",
+    "googleText": "Meal images use the server-configured Gemini image model, separate from your text model.",
+    "serverModel": "Server image model",
     "errors": {
-      "onlyGoogle": "Image generation currently supports only the Google provider.",
       "default": "An error occurred",
       "noImage": "No image was returned"
     }

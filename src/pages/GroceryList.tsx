@@ -46,6 +46,12 @@ import { getScaledIngredients, resolveEffectiveServings } from '../lib/meal-scal
 import { loadWeekStartsOn } from '../lib/preferences';
 import { useTranslation } from 'react-i18next';
 import { dateLocaleFor } from '../lib/date-locale';
+import {
+  groceryChecksStorageKey,
+  readGroceryChecks,
+  toggleGroceryCheck,
+  writeGroceryChecks,
+} from '../lib/grocery-checks';
 
 interface GroceryItem {
   name: string;
@@ -192,7 +198,9 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
   const [plannerItems, setPlannerItems] = useState<PlannerItem[]>([]);
   const [pantryItems, setPantryItems] = useState<PantryItem[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
+  const [checkedItems, setCheckedItems] = useState<{ storageKey: string; items: Record<string, boolean> }>(
+    () => ({ storageKey: '', items: {} }),
+  );
   const [isGrouping, setIsGrouping] = useState(false);
   const [categories, setCategories] = useState<Record<string, string>>({});
   const [newPantryName, setNewPantryName] = useState('');
@@ -273,6 +281,18 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
   const weekStartsOn = loadWeekStartsOn();
   const startDate = startOfWeek(selectedDate, { weekStartsOn });
   const endDate = addDays(startDate, 6);
+  const checkedItemsStorageKey = groceryChecksStorageKey(
+    localStorage.getItem('familyId') || 'default',
+    format(startDate, 'yyyy-MM-dd'),
+  );
+
+  useEffect(() => {
+    setCheckedItems({
+      storageKey: checkedItemsStorageKey,
+      items: readGroceryChecks(localStorage, checkedItemsStorageKey),
+    });
+  }, [checkedItemsStorageKey]);
+
   const dateLocale = dateLocaleFor(i18n.resolvedLanguage);
   const fallbackCategoryLabels: Record<string, string> = {
     'Dairy & Cold': t('grocery.categories.dairyCold'),
@@ -382,7 +402,8 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
         name: bucket.name,
         amount: display.amount,
         measure: display.measure,
-        checked: checkedItems[bucket.key] || false,
+        checked:
+          checkedItems.storageKey === checkedItemsStorageKey && checkedItems.items[bucket.key] === true,
         category: bucket.category || 'Uncategorized',
         vagueUnit: isVagueUnit(display.measure),
       };
@@ -408,11 +429,14 @@ export default function GroceryList({ initialTab = 'list' }: GroceryListProps) {
     return acc;
   }, {});
 
-  const toggleItem = (key: string) => {
-    setCheckedItems((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+  const toggleItem = (itemKey: string) => {
+    const current =
+      checkedItems.storageKey === checkedItemsStorageKey
+        ? checkedItems.items
+        : readGroceryChecks(localStorage, checkedItemsStorageKey);
+    const next = toggleGroceryCheck(current, itemKey);
+    writeGroceryChecks(localStorage, checkedItemsStorageKey, next);
+    setCheckedItems({ storageKey: checkedItemsStorageKey, items: next });
   };
 
   const sortedItems = Object.entries(groceryList).sort(([, a], [, b]) => {

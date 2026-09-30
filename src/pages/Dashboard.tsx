@@ -32,7 +32,7 @@ import {
   mergeMealForRestore,
   type AiJobNavigationState,
 } from '../lib/ai-job-nav-state';
-import { loadDefaultServings, loadWeekStartsOn } from '../lib/preferences';
+import { loadWeekStartsOn } from '../lib/preferences';
 import { useTranslation } from 'react-i18next';
 import { dateLocaleFor } from '../lib/date-locale';
 
@@ -551,18 +551,6 @@ export default function Dashboard() {
         <ImportRecipeModal
           isOpen={isImportModalOpen}
           onClose={() => setIsImportModalOpen(false)}
-          onSave={(draftMeal) => {
-            setIsImportModalOpen(false);
-            const servingsOk =
-              draftMeal.servings != null &&
-              Number.isFinite(Number(draftMeal.servings)) &&
-              Number(draftMeal.servings) > 0;
-            setEditingMeal({
-              ...draftMeal,
-              servings: servingsOk ? draftMeal.servings : loadDefaultServings(),
-            });
-            setIsAddModalOpen(true);
-          }}
         />
       )}
 
