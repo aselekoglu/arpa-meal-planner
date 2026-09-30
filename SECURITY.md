@@ -16,7 +16,7 @@ We actively maintain and provide security updates for the following versions:
 We take the security of **ARPA: Meal Planner** seriously. If you believe you have discovered a security vulnerability, please follow these steps:
 
 1. **Do NOT open a public issue** on GitHub for security vulnerabilities.
-2. Email details of the vulnerability to [aselekoglu@gmail.com].
+2. Email details of the vulnerability to [aselekoglu97@gmail.com].
 3. Include as much information as possible to help us reproduce and fix the issue, such as:
    - Description of the vulnerability
    - Steps to reproduce
