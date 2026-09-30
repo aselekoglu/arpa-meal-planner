@@ -1,12 +1,19 @@
 import Database from 'better-sqlite3';
+import { mkdirSync } from 'node:fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const dbPath = path.join(__dirname, 'meals.db');
-const db = new Database(dbPath);
+const configuredDbPath = process.env.ARPA_DB_PATH?.trim();
+const isProduction = process.env.NODE_ENV === 'production';
+if (isProduction && !configuredDbPath) {
+  throw new Error('Production requires ARPA_DB_PATH pointing to an existing persistent database');
+}
+const dbPath = configuredDbPath ? path.resolve(configuredDbPath) : path.join(__dirname, 'meals.db');
+if (!isProduction) mkdirSync(path.dirname(dbPath), { recursive: true });
+const db = new Database(dbPath, { fileMustExist: isProduction });
 
 db.pragma('journal_mode = WAL');
 db.pragma('foreign_keys = ON');
