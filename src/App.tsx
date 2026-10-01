@@ -110,7 +110,7 @@ export default function App() {
     <Router>
       <AiJobQueueProvider>
       <div className="min-h-screen bg-surface text-on-surface font-sans antialiased">
-        <div className="flex min-h-screen">
+        <div className="flex min-h-screen w-full min-w-0">
           {/* Desktop sidebar */}
           <aside className="hidden lg:flex w-72 flex-col bg-surface-container-low px-6 py-8 gap-8 fixed inset-y-0 left-0 z-30">
             <div className="flex items-center gap-3 px-2">
@@ -195,7 +195,7 @@ export default function App() {
           </aside>
 
           {/* Main column */}
-          <div className="flex-1 flex flex-col lg:ml-72">
+          <div className="flex-1 min-w-0 flex flex-col lg:ml-72">
             {/* Desktop top bar */}
             <header className="hidden lg:flex sticky top-0 z-20 h-20 items-center px-10 bg-surface/80 backdrop-blur-xl">
               <div className="flex-1 max-w-xl">
@@ -275,7 +275,7 @@ export default function App() {
               </div>
             </header>
 
-            <main className="relative flex-1 px-5 lg:px-10 py-6 lg:py-8 max-w-[1600px] w-full mx-auto pb-28 lg:pb-12">
+            <main className="relative flex-1 min-w-0 px-5 lg:px-10 py-6 lg:py-8 max-w-[1600px] w-full mx-auto pb-28 lg:pb-12">
               <AiJobQueuePanel />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
