@@ -128,13 +128,13 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
 
   return (
     <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-surface rounded-[2rem] shadow-2xl w-full max-w-md overflow-hidden border border-outline-variant/15">
-        <div className="px-6 py-5 flex justify-between items-start">
-          <div className="flex items-center gap-3">
+      <div className="bg-surface rounded-[2rem] shadow-2xl w-full max-w-md min-w-0 overflow-hidden border border-outline-variant/15">
+        <div className="px-4 sm:px-6 py-5 flex justify-between items-start gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary-container/10 text-primary-container flex items-center justify-center">
               <Globe className="w-5 h-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <h2 className="text-xl font-display font-extrabold text-primary-container dark:text-primary-fixed-dim tracking-tight">
                 {t('importRecipeModal.title')}
               </h2>
@@ -145,13 +145,13 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full text-outline hover:bg-surface-container-high transition-colors"
+            className="p-2 shrink-0 rounded-full text-outline hover:bg-surface-container-high transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="px-6 pb-2 space-y-4">
+        <div className="px-4 sm:px-6 pb-2 space-y-4">
           <p className="text-sm text-on-surface-variant leading-relaxed">
             {t('importRecipeModal.text')}
           </p>
@@ -199,7 +199,7 @@ export default function ImportRecipeModal({ isOpen, onClose }: ImportRecipeModal
           </div>
         </div>
 
-        <div className="px-6 py-4 mt-4 bg-surface-container-low/95 flex justify-end gap-3 border-t border-outline-variant/15">
+        <div className="px-4 sm:px-6 py-4 mt-4 bg-surface-container-low/95 flex flex-wrap justify-end gap-3 border-t border-outline-variant/15">
           <button
             onClick={onClose}
             className="px-5 py-2.5 text-on-surface-variant font-display font-semibold text-sm rounded-full hover:bg-surface-container-high dark:hover:bg-surface-container-highest transition-colors"
