@@ -466,9 +466,9 @@ export default function AddMealModal({
 
   return (
     <div className="fixed inset-0 bg-black/45 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-surface rounded-[2rem] shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh] border border-outline-variant/15">
-        <div className="px-6 py-5 flex justify-between items-center sticky top-0 bg-surface z-10 border-b border-outline-variant/15">
-          <div>
+      <div className="bg-surface rounded-[2rem] shadow-2xl w-full max-w-2xl min-w-0 overflow-hidden flex flex-col max-h-[92vh] border border-outline-variant/15">
+        <div className="px-4 sm:px-6 py-5 flex justify-between items-center gap-3 sticky top-0 bg-surface z-10 border-b border-outline-variant/15">
+          <div className="min-w-0">
             <h2 className="text-xl font-display font-extrabold text-primary-container dark:text-primary-fixed-dim tracking-tight">
               {editingMeal && editingMeal.id ? t('addMealModal.title.edit') : t('addMealModal.title.add')}
             </h2>
@@ -478,13 +478,13 @@ export default function AddMealModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full text-outline hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors"
+            className="p-2 shrink-0 rounded-full text-outline hover:bg-surface-container-high dark:hover:bg-surface-container-high transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 flex-1 overflow-y-auto thin-scrollbar">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 flex-1 min-h-0 min-w-0 overflow-y-auto thin-scrollbar">
           <div className="space-y-7">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -641,9 +641,9 @@ export default function AddMealModal({
             )}
 
             <div>
-              <div className="flex justify-between items-center mb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                 <label className={fieldLabel + ' mb-0'}>{t('addMealModal.fields.instructions.label')}</label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <button
                     type="button"
                     onClick={handleFetchInstructions}
@@ -684,7 +684,7 @@ export default function AddMealModal({
                       }}
                       placeholder={t('addMealModal.fields.step.placeholder') + ` ${index + 1}`}
                       rows={2}
-                      className={`${inputClass} resize-y`}
+                      className={`${inputClass} flex-1 min-w-0 resize-y`}
                     />
                     <button
                       type="button"
@@ -706,9 +706,9 @@ export default function AddMealModal({
             </div>
 
             <div ref={ingredientsSectionRef}>
-              <div className="flex justify-between items-center mb-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-between sm:items-center mb-3">
                 <label className={fieldLabel + ' mb-0'}>{t('addMealModal.fields.ingredients.label')}</label>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                   <button
                     type="button"
                     onClick={handleEstimateNutrition}
@@ -817,7 +817,7 @@ export default function AddMealModal({
           </div>
         </form>
 
-        <div className="px-6 py-4 bg-surface-container-low/95 border-t border-outline-variant/15 flex justify-end gap-3 sticky bottom-0 z-10">
+        <div className="px-4 sm:px-6 py-4 bg-surface-container-low/95 border-t border-outline-variant/15 flex flex-wrap justify-end gap-3 sticky bottom-0 z-10 shrink-0">
           <button
             type="button"
             onClick={onClose}
