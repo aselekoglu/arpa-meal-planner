@@ -209,10 +209,10 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 min-w-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
+      <div className="flex min-w-0 flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="min-w-0">
           <h1 className="text-3xl md:text-4xl xl:text-5xl font-display font-extrabold tracking-tight text-primary-container dark:text-primary-fixed-dim">
             {t('dashboard.pageTitle')}
           </h1>
@@ -223,7 +223,7 @@ export default function Dashboard() {
             })}
           </p>
         </div>
-        <div className="flex flex-wrap gap-3 items-center">
+        <div className="flex w-full min-w-0 flex-wrap gap-3 items-center md:w-auto">
           <div className="flex items-center gap-2 bg-surface-container-low rounded-full p-1.5">
             <button
               onClick={() => setSelectedDate(addDays(selectedDate, -7))}
