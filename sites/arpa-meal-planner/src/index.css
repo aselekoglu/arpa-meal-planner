@@ -1,0 +1,429 @@
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* Surfaces (warm cream palette) */
+  --color-surface: #fef9f2;
+  --color-surface-bright: #fef9f2;
+  --color-surface-dim: #ded9d3;
+  --color-surface-container-lowest: #ffffff;
+  --color-surface-container-low: #f8f3ec;
+  --color-surface-container: #f2ede6;
+  --color-surface-container-high: #ece7e1;
+  --color-surface-container-highest: #e6e2db;
+  --color-surface-variant: #e6e2db;
+
+  /* Outlines */
+  --color-outline: #6f7973;
+  --color-outline-variant: #bec9c2;
+
+  /* Foreground */
+  --color-on-surface: #1d1c18;
+  --color-on-surface-variant: #3f4944;
+  --color-on-background: #1d1c18;
+
+  /* Primary (deep emerald) */
+  --color-primary: #004532;
+  --color-primary-container: #065f46;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #8bd6b7;
+  --color-on-primary-fixed: #002116;
+  --color-on-primary-fixed-variant: #00513b;
+  --color-primary-fixed: #a6f2d1;
+  --color-primary-fixed-dim: #8bd6b6;
+
+  /* Secondary (warm coral) */
+  --color-secondary: #9f402d;
+  --color-secondary-container: #fd876f;
+  --color-on-secondary: #ffffff;
+  --color-on-secondary-container: #732010;
+  --color-secondary-fixed: #ffdad3;
+  --color-secondary-fixed-dim: #ffb4a5;
+  --color-on-secondary-fixed: #3e0500;
+  --color-on-secondary-fixed-variant: #802918;
+
+  /* Tertiary (toasted ochre) */
+  --color-tertiary: #672903;
+  --color-tertiary-container: #853f19;
+  --color-on-tertiary: #ffffff;
+  --color-on-tertiary-container: #ffb694;
+  --color-tertiary-fixed: #ffdbcc;
+  --color-tertiary-fixed-dim: #ffb693;
+  --color-on-tertiary-fixed: #351000;
+  --color-on-tertiary-fixed-variant: #76330d;
+
+  /* Status */
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-error-container: #ffdad6;
+  --color-on-error-container: #93000a;
+
+  /* Inverse */
+  --color-inverse-surface: #32302c;
+  --color-inverse-on-surface: #f5f0e9;
+  --color-inverse-primary: #8bd6b6;
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-display:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-headline:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+}
+
+:root {
+  --arpa-mobile-nav-height: 4.75rem;
+  --arpa-mobile-bottom-clearance: calc(
+    var(--arpa-mobile-nav-height) + env(safe-area-inset-bottom, 0px)
+  );
+}
+
+/*
+ * Dark mode: Stitch design system “The Digital Epicurean” (project 8750980870039906372).
+ * Tokens from namedColors / designMd — tonal charcoal + mint primary + antique gold tertiary.
+ */
+html.dark {
+  --color-surface: #131313;
+  --color-surface-bright: #393939;
+  --color-surface-dim: #131313;
+  --color-surface-container-lowest: #0e0e0e;
+  --color-surface-container-low: #1c1b1b;
+  --color-surface-container: #201f1f;
+  --color-surface-container-high: #2a2a2a;
+  --color-surface-container-highest: #353534;
+  --color-surface-variant: #353534;
+
+  --color-outline: #89938d;
+  --color-outline-variant: #3f4944;
+
+  --color-on-surface: #e5e2e1;
+  --color-on-surface-variant: #bec9c2;
+  --color-on-background: #e5e2e1;
+
+  --color-primary: #8bd6b6;
+  --color-on-primary: #003828;
+  --color-primary-container: #065f46;
+  --color-on-primary-container: #8bd6b7;
+  --color-on-primary-fixed: #002116;
+  --color-on-primary-fixed-variant: #00513b;
+  --color-primary-fixed: #a6f2d1;
+  --color-primary-fixed-dim: #8bd6b6;
+
+  --color-secondary: #c3c7cd;
+  --color-on-secondary: #2c3136;
+  --color-secondary-container: #454a4f;
+  --color-on-secondary-container: #b4b9bf;
+  --color-secondary-fixed: #dfe3e9;
+  --color-secondary-fixed-dim: #c3c7cd;
+  --color-on-secondary-fixed: #171c20;
+  --color-on-secondary-fixed-variant: #43474c;
+
+  --color-tertiary: #e9c176;
+  --color-on-tertiary: #412d00;
+  --color-tertiary-container: #6b4e0d;
+  --color-on-tertiary-container: #e9c177;
+  --color-tertiary-fixed: #ffdea5;
+  --color-tertiary-fixed-dim: #e9c176;
+  --color-on-tertiary-fixed: #261900;
+  --color-on-tertiary-fixed-variant: #5d4201;
+
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  --color-inverse-surface: #e5e2e1;
+  --color-inverse-on-surface: #313030;
+  --color-inverse-primary: #1b6b51;
+}
+
+/* Base styles */
+html {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+}
+
+.dark body {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+}
+
+.arpa-mobile-scroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.arpa-mobile-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.arpa-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(1rem, env(safe-area-inset-top, 0px))
+    max(1rem, env(safe-area-inset-right, 0px))
+    max(1rem, env(safe-area-inset-bottom, 0px))
+    max(1rem, env(safe-area-inset-left, 0px));
+}
+
+.arpa-dialog-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  width: 100%;
+  max-height: calc(100vh - 2rem);
+  max-height: calc(
+    100dvh - max(1rem, env(safe-area-inset-top, 0px)) -
+      max(1rem, env(safe-area-inset-bottom, 0px))
+  );
+  overflow: hidden;
+}
+
+.arpa-dialog-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.arpa-dialog-footer {
+  flex-shrink: 0;
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 1023px) {
+  .arpa-touch {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .arpa-mobile-header {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  .arpa-mobile-nav {
+    height: var(--arpa-mobile-bottom-clearance);
+    padding-top: 0.25rem;
+    padding-bottom: max(0.25rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .arpa-mobile-input {
+    font-size: 16px;
+  }
+
+  .arpa-dialog-backdrop {
+    align-items: flex-end;
+    padding: max(0.5rem, env(safe-area-inset-top, 0px))
+      max(0.5rem, env(safe-area-inset-right, 0px))
+      max(0.5rem, env(safe-area-inset-bottom, 0px))
+      max(0.5rem, env(safe-area-inset-left, 0px));
+  }
+
+  .arpa-dialog-panel {
+    max-height: calc(100vh - 1rem);
+    max-height: calc(
+      100dvh - max(0.5rem, env(safe-area-inset-top, 0px)) -
+        max(0.5rem, env(safe-area-inset-bottom, 0px))
+    );
+    border-radius: 1.5rem 1.5rem 0 0;
+  }
+
+  .arpa-dialog-footer {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+}
+
+@media (min-width: 1024px) {
+  .arpa-dialog-panel {
+    border-radius: 1.5rem;
+  }
+}
+
+@media (max-width: 639px) {
+  .arpa-dashboard {
+    gap: 2rem;
+  }
+
+  .arpa-dashboard-header {
+    gap: 1rem;
+  }
+
+  .arpa-dashboard-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .arpa-dashboard-actions > * {
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .arpa-dashboard-week-range {
+    grid-column: 1 / -1;
+    min-width: 0;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .arpa-dashboard-week-range > span {
+    padding-inline: 0.25rem;
+    font-size: 0.75rem;
+  }
+
+  .arpa-nutrition-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.625rem;
+  }
+
+  .arpa-weekly-strip {
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+    gap: 0.75rem;
+  }
+
+  .arpa-weekly-card {
+    min-width: min(76vw, 17rem);
+  }
+
+  .arpa-weekly-card-image {
+    height: 7rem;
+  }
+
+  .arpa-dashboard-search {
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .arpa-recipe-filters {
+    margin-inline: -1rem;
+    padding-inline: 1rem;
+  }
+
+  .arpa-recipe-card {
+    min-width: 0;
+  }
+
+  .arpa-recipe-card-image {
+    height: 10rem;
+  }
+
+  .arpa-recipe-card-title,
+  .arpa-recipe-card-ingredient {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .arpa-recipe-card-amount {
+    max-width: 42%;
+    white-space: normal;
+    text-align: right;
+    overflow-wrap: anywhere;
+  }
+
+  .arpa-preferences {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .arpa-preferences-section {
+    min-width: 0;
+    padding: 1rem;
+    border-radius: 1.5rem;
+  }
+
+  .arpa-preferences input:not([type='radio']):not([type='checkbox']),
+  .arpa-preferences select {
+    max-width: 100%;
+    min-width: 0;
+    font-size: 16px;
+  }
+
+  .arpa-preferences-option {
+    min-height: 44px;
+    padding-block: 0.35rem;
+  }
+
+  .arpa-preferences-option > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .arpa-preferences-pills > button {
+    min-height: 44px;
+  }
+
+  .arpa-preferences-save-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .arpa-preferences input[type='number'] {
+    width: 100%;
+  }
+
+  .arpa-mobile-nav a {
+    min-width: 0;
+    padding-inline: 0.125rem;
+    overflow-wrap: anywhere;
+    text-align: center;
+    line-height: 1.15;
+  }
+}
+
+/* Utility: hide scrollbars while keeping scroll behaviour */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Custom scrollbar for desktop side panels */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-surface-container-high);
+  border-radius: 9999px;
+}
+
+@keyframes ai-job-bar-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(400%);
+  }
+}
+
+.ai-job-indeterminate-fill {
+  width: 38%;
+  height: 100%;
+  border-radius: 9999px;
+  background: var(--color-primary-container);
+  animation: ai-job-bar-slide 1.15s ease-in-out infinite;
+}

@@ -1,0 +1,8 @@
+{
+  "name": "arpa-meal-planner-local",
+  "main": "dist/server/index.js",
+  "compatibility_date": "2026-05-15",
+  "d1_databases": [{"binding":"DB","database_name":"arpa-meal-planner-local","database_id":"local-arpa"}],
+  "r2_buckets": [{"binding":"BUCKET","bucket_name":"arpa-images-local"}],
+  "vars": {"ARPA_OWNER_EMAIL":"aselekoglu97@gmail.com"}
+}
