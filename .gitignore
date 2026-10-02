@@ -10,3 +10,8 @@ coverage/
 meals.db
 meals.db-shm
 meals.db-wal
+
+# Local-only operational helpers in the separately managed Sites checkout.
+/sites/arpa-meal-planner/scripts/migrate-data.mjs
+/sites/arpa-meal-planner/scripts/transfer-gemini.mjs
+/sites/arpa-meal-planner/docs/superpowers/
