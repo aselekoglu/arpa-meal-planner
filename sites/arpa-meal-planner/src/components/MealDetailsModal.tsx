@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import {
   X,
   ExternalLink,
@@ -33,6 +33,30 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
   const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(0);
   const [displayServings, setDisplayServings] = useState(4);
+  const instructionSwipeStart = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const instructionCount = meal?.instructions?.length ?? 0;
+
+  const handleInstructionPointerDown = (event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== 'touch' || !event.isPrimary) return;
+    instructionSwipeStart.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+    };
+  };
+
+  const handleInstructionPointerUp = (event: ReactPointerEvent<HTMLDivElement>) => {
+    const start = instructionSwipeStart.current;
+    instructionSwipeStart.current = null;
+    if (!start || start.pointerId !== event.pointerId || instructionCount < 2) return;
+
+    const deltaX = event.clientX - start.x;
+    const deltaY = event.clientY - start.y;
+    if (Math.abs(deltaX) < 48 || Math.abs(deltaX) < Math.abs(deltaY) * 1.2) return;
+
+    const direction = deltaX < 0 ? 1 : -1;
+    setCurrentStep((step) => Math.min(instructionCount - 1, Math.max(0, step + direction)));
+  };
 
   const baseServings = meal ? getMealBaseServings(meal) : 4;
 
@@ -217,7 +241,14 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                     </div>
                   </div>
 
-                  <div className="flex-1 relative">
+                  <div
+                    className="flex-1 touch-pan-y"
+                    onPointerDown={handleInstructionPointerDown}
+                    onPointerUp={handleInstructionPointerUp}
+                    onPointerCancel={() => {
+                      instructionSwipeStart.current = null;
+                    }}
+                  >
                     <AnimatePresence mode="wait">
                       <motion.div
                         key={currentStep}
@@ -225,23 +256,23 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -20 }}
                         transition={{ duration: 0.2 }}
-                        className="absolute inset-0 flex gap-4"
+                        className="flex items-start gap-4"
                       >
                         <span className="flex-shrink-0 w-10 h-10 rounded-full bg-primary-fixed text-primary font-display font-extrabold flex items-center justify-center">
                           {currentStep + 1}
                         </span>
-                        <p className="text-on-surface text-base lg:text-lg leading-relaxed whitespace-pre-wrap">
+                        <p className="min-w-0 flex-1 text-on-surface text-base lg:text-lg leading-relaxed whitespace-pre-wrap break-words">
                           {meal.instructions[currentStep]}
                         </p>
                       </motion.div>
                     </AnimatePresence>
                   </div>
 
-                  <div className="flex justify-between mt-8 pt-4">
+                  <div className="flex flex-wrap gap-2 mt-8 pt-4">
                     <button
-                      onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
+                      onClick={() => setCurrentStep((step) => Math.max(0, step - 1))}
                       disabled={currentStep === 0}
-                      className="arpa-touch inline-flex items-center gap-1 text-sm font-display font-semibold px-4 py-2.5 rounded-full text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                      className="arpa-touch inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm font-display font-semibold px-4 py-2.5 rounded-full text-on-surface-variant hover:bg-surface-container-high disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                     >
                       <ChevronLeft className="w-4 h-4" /> {t('mealDetailsModal.instructions.prev')}
                     </button>
@@ -250,7 +281,7 @@ export default function MealDetailsModal({ isOpen, onClose, onEdit, meal }: Meal
                         setCurrentStep(Math.min(meal.instructions!.length - 1, currentStep + 1))
                       }
                       disabled={currentStep === meal.instructions.length - 1}
-                      className="arpa-touch inline-flex items-center gap-1 text-sm font-display font-semibold px-5 py-2.5 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
+                      className="arpa-touch ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap text-sm font-display font-semibold px-5 py-2.5 rounded-full bg-gradient-to-br from-primary to-primary-container text-on-primary hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-sm"
                     >
                       {t('mealDetailsModal.instructions.next')} <ChevronRight className="w-4 h-4" />
                     </button>
